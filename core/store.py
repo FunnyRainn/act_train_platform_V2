@@ -107,6 +107,43 @@ def list_videos(project_id: str | None = None) -> list[dict[str, Any]]:
         return rows_to_dicts(conn.execute(sql, params).fetchall())
 
 
+def list_video_assets() -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        return rows_to_dicts(conn.execute("SELECT * FROM video_assets ORDER BY created_at DESC").fetchall())
+
+
+def get_video_asset(asset_id: str) -> dict[str, Any]:
+    with get_conn() as conn:
+        row = row_to_dict(conn.execute("SELECT * FROM video_assets WHERE id=?", (asset_id,)).fetchone())
+    if not row:
+        raise KeyError(f"素材不存在: {asset_id}")
+    return row
+
+
+def create_video_asset(payload: dict[str, Any]) -> dict[str, Any]:
+    asset_id = payload.get("id") or new_id("asset")
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO video_assets(id, name, source_type, original_path, stored_path, fps, frame_count, duration_sec, width, height)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                asset_id,
+                payload["name"],
+                payload["source_type"],
+                str(payload["original_path"]),
+                str(payload["stored_path"]),
+                float(payload.get("fps") or 0),
+                int(payload.get("frame_count") or 0),
+                float(payload.get("duration_sec") or 0),
+                int(payload.get("width") or 0),
+                int(payload.get("height") or 0),
+            ),
+        )
+    return get_video_asset(asset_id)
+
+
 def get_video(video_id: str) -> dict[str, Any]:
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM videos WHERE id=?", (video_id,)).fetchone())
@@ -120,12 +157,13 @@ def create_video(payload: dict[str, Any]) -> dict[str, Any]:
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO videos(id, project_id, name, source_type, path, fps, frame_count, duration_sec, width, height)
-            VALUES(?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO videos(id, project_id, asset_id, name, source_type, path, fps, frame_count, duration_sec, width, height)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 video_id,
                 payload["project_id"],
+                payload.get("asset_id"),
                 payload["name"],
                 payload["source_type"],
                 str(payload["path"]),
@@ -392,8 +430,8 @@ def save_train_job(payload: dict[str, Any]) -> dict[str, Any]:
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO train_jobs(id, project_id, dataset_version_id, name, base_model_path, output_dir, status, params_json, metrics_json, log_text)
-            VALUES(?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO train_jobs(id, project_id, dataset_version_id, name, base_model_path, output_dir, status, params_json, progress_json, metrics_json, log_text, process_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 job_id,
@@ -404,15 +442,17 @@ def save_train_job(payload: dict[str, Any]) -> dict[str, Any]:
                 str(payload["output_dir"]),
                 payload.get("status") or "created",
                 json_dumps(payload.get("params") or {}),
+                json_dumps(payload.get("progress") or {}),
                 json_dumps(payload.get("metrics") or {}),
                 payload.get("log_text") or "",
+                int(payload.get("process_id") or 0),
             ),
         )
     return get_train_job(job_id)
 
 
 def update_train_job(job_id: str, **updates: Any) -> None:
-    allowed = {"status", "metrics_json", "log_text", "started_at", "finished_at"}
+    allowed = {"status", "progress_json", "metrics_json", "log_text", "process_id", "started_at", "finished_at"}
     fields = []
     values = []
     for key, value in updates.items():
@@ -433,6 +473,7 @@ def get_train_job(job_id: str) -> dict[str, Any]:
     if not row:
         raise KeyError(f"训练任务不存在: {job_id}")
     row["params"] = json_loads(row.pop("params_json"), {})
+    row["progress"] = json_loads(row.pop("progress_json", None), {})
     row["metrics"] = json_loads(row.pop("metrics_json"), {})
     return row
 
@@ -448,6 +489,7 @@ def list_train_jobs(project_id: str | None = None) -> list[dict[str, Any]]:
         rows = rows_to_dicts(conn.execute(sql, params).fetchall())
     for row in rows:
         row["params"] = json_loads(row.pop("params_json"), {})
+        row["progress"] = json_loads(row.pop("progress_json", None), {})
         row["metrics"] = json_loads(row.pop("metrics_json"), {})
     return rows
 

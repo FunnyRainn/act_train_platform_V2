@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}训练任务 - 标注训练平台{% endblock %}
+{% block title %}模型训练任务 - 标注训练平台{% endblock %}
 {% block content %}
 <section class="page-head">
   <div>
-    <h1>训练任务</h1>
-    <p>训练任务会调用当前训练环境中的 Ultralytics YOLO。启动前请确认显卡和 CUDA 环境正常。</p>
+    <h1>模型训练任务 <button class="help-dot" type="button" data-help-key="training">?</button></h1>
+    <p>训练任务会调用当前训练环境中的通用检测模型训练程序。启动前请确认显卡环境正常。</p>
   </div>
 </section>
 <section class="layout-two">
   <form class="panel form" id="train-form">
-    <h2>创建训练任务</h2>
-    <label>项目<select name="project_id"></select></label>
-    <label>数据集版本<select name="dataset_version_id"></select></label>
-    <label>任务名称<input name="name" value="YOLO 训练任务"></label>
-    <label>基础模型<input name="base_model_path" value="yolo11m.pt"></label>
+    <h2>创建模型训练任务</h2>
+    <label>产品<select name="project_id"></select></label>
+    <label>训练数据集<select name="dataset_version_id"></select></label>
+    <label>任务名称<input name="name" value="模型训练任务"></label>
+    <label>基础模型路径<input name="base_model_path" value="yolo11m.pt"></label>
     <div class="form-row">
       <label>epochs<input name="epochs" type="number" value="50"></label>
       <label>imgsz<input name="imgsz" type="number" value="1280"></label>
@@ -24,6 +24,7 @@
   </form>
   <section class="panel">
     <h2>训练任务列表</h2>
+    <div id="gpu-status" class="gpu-status"></div>
     <div id="train-list" class="table-list"></div>
   </section>
 </section>

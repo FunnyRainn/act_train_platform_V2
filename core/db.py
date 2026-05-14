@@ -55,3 +55,18 @@ def init_db() -> None:
     schema_path = Path(__file__).with_name("schema.sql")
     with get_conn() as conn:
         conn.executescript(schema_path.read_text(encoding="utf-8"))
+        _migrate(conn)
+
+
+def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return any(row["name"] == column for row in rows)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    if not _has_column(conn, "videos", "asset_id"):
+        conn.execute("ALTER TABLE videos ADD COLUMN asset_id TEXT")
+    if not _has_column(conn, "train_jobs", "progress_json"):
+        conn.execute("ALTER TABLE train_jobs ADD COLUMN progress_json TEXT NOT NULL DEFAULT '{}'")
+    if not _has_column(conn, "train_jobs", "process_id"):
+        conn.execute("ALTER TABLE train_jobs ADD COLUMN process_id INTEGER NOT NULL DEFAULT 0")

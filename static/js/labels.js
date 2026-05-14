@@ -20,10 +20,11 @@ async function refreshLabels() {
 
 $("#label-form").addEventListener("submit", async event => {
   event.preventDefault();
+  const form = event.currentTarget;
   try {
-    await apiPost("/api/labels", formToObject(event.currentTarget));
-    event.currentTarget.reset();
-    event.currentTarget.enabled.checked = true;
+    await apiPost("/api/labels", formToObject(form));
+    form.reset();
+    form.enabled.checked = true;
     showToast("标签已保存");
     await refreshLabels();
   } catch (error) {

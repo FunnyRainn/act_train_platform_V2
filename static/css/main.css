@@ -30,6 +30,10 @@ textarea {
   font: inherit;
 }
 
+.hidden {
+  display: none !important;
+}
+
 button {
   border: 1px solid var(--line);
   background: #fff;
@@ -240,6 +244,21 @@ label.inline input {
   background: #fbfcff;
 }
 
+.row.selected {
+  border-color: var(--primary);
+  background: #eef4ff;
+}
+
+.button-link {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 13px;
+  text-decoration: none;
+  color: var(--text);
+  background: #fff;
+}
+
 .row-title {
   font-weight: 700;
 }
@@ -280,6 +299,102 @@ label.inline input {
 
 .toast.show {
   display: block;
+}
+
+.help-dot {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  color: #8a95a8;
+  background: #f3f6fb;
+  font-size: 12px;
+  line-height: 18px;
+  vertical-align: middle;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 30;
+}
+
+.modal-backdrop.show {
+  display: flex;
+}
+
+.modal {
+  width: min(560px, calc(100vw - 36px));
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+}
+
+.modal-close {
+  float: right;
+}
+
+.modal pre {
+  white-space: pre-wrap;
+  background: #f6f8fc;
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 7px;
+}
+
+.label-card-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.label-card {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px;
+  background: #fbfcff;
+  cursor: pointer;
+}
+
+.label-card.selected {
+  border-color: var(--primary);
+  background: #eef4ff;
+  color: var(--primary-dark);
+}
+
+.progress-shell {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e8edf5;
+  margin: 8px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+}
+
+.chart {
+  width: 100%;
+  height: 170px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  margin-top: 10px;
+}
+
+.gpu-status {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .annotator {

@@ -81,3 +81,33 @@ function fillMultiSelect(select, items, getValue, getLabel) {
 function rowHtml(title, meta, action = "") {
   return `<div class="row"><div><div class="row-title">${title}</div><div class="row-meta">${meta}</div></div><div>${action}</div></div>`;
 }
+
+function secondsText(seconds) {
+  if (seconds === null || seconds === undefined) return "估算中";
+  const s = Math.max(0, Number(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}小时${m}分钟`;
+  return `${m}分钟`;
+}
+
+function showHelp(key) {
+  const item = window.HELP_REGISTRY?.[key];
+  if (!item) return;
+  $("#help-title").textContent = item.title;
+  $("#help-body").textContent = item.body;
+  $("#help-example").textContent = item.example || "";
+  $("#help-example").style.display = item.example ? "block" : "none";
+  $("#help-modal").classList.add("show");
+}
+
+document.addEventListener("click", event => {
+  const help = event.target.closest("[data-help-key]");
+  if (help) {
+    event.preventDefault();
+    showHelp(help.dataset.helpKey);
+  }
+  if (event.target.matches(".modal-close") || event.target.id === "help-modal") {
+    $("#help-modal").classList.remove("show");
+  }
+});

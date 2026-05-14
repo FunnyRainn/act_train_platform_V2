@@ -5,6 +5,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = PROJECT_ROOT / "data"
+ASSETS_DIR = DATA_ROOT / "assets"
 UPLOADS_DIR = DATA_ROOT / "uploads"
 IMPORTS_DIR = DATA_ROOT / "imports"
 FRAMES_DIR = DATA_ROOT / "frames"
@@ -19,6 +20,7 @@ def ensure_runtime_dirs() -> None:
     """Create all runtime directories used by the platform."""
     for path in [
         DATA_ROOT,
+        ASSETS_DIR,
         UPLOADS_DIR,
         IMPORTS_DIR,
         FRAMES_DIR,

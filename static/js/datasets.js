@@ -1,6 +1,6 @@
 async function refreshDatasets() {
   const data = await loadBootstrap();
-  fillSelect($("#dataset-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择项目");
+  fillSelect($("#dataset-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
   fillMultiSelect($("#dataset-form select[name=frame_set_ids]"), data.frame_sets, item => item.id, item => `${item.name} (${item.frame_count}帧)`);
   fillMultiSelect($("#dataset-form select[name=history_dataset_ids]"), data.datasets, item => item.id, item => `${item.name} (${item.status})`);
   $("#dataset-list").innerHTML = data.datasets.map(ds => rowHtml(
@@ -17,7 +17,7 @@ $("#dataset-form").addEventListener("submit", async event => {
       showToast("提示：本次未混入历史数据集，请确认不会影响旧标签能力", "warn");
     }
     await apiPost("/api/datasets/export", payload);
-    showToast("数据集版本已导出");
+    showToast("训练数据集已导出");
     await refreshDatasets();
   } catch (error) {
     showToast(error.message, "error");

@@ -5,7 +5,7 @@ from pathlib import Path
 import cv2
 
 from . import store
-from .paths import FRAMES_DIR, UPLOADS_DIR
+from .paths import ASSETS_DIR, FRAMES_DIR, UPLOADS_DIR
 from .utils import copy_file, new_id, safe_name
 
 
@@ -28,49 +28,67 @@ def probe_video(path: Path) -> dict:
     }
 
 
-def register_uploaded_video(project_id: str, filename: str, bytes_data: bytes) -> dict:
+def _create_product_video_from_asset(project_id: str, asset: dict) -> dict:
     video_id = new_id("video")
-    suffix = Path(filename).suffix or ".mp4"
-    save_path = UPLOADS_DIR / project_id / f"{video_id}_{safe_name(Path(filename).stem)}{suffix}"
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-    save_path.write_bytes(bytes_data)
-    meta = probe_video(save_path)
+    src = Path(asset["stored_path"])
+    dst = UPLOADS_DIR / project_id / f"{video_id}_{safe_name(src.stem)}{src.suffix}"
+    copy_file(src, dst)
     return store.create_video(
         {
             "id": video_id,
             "project_id": project_id,
+            "asset_id": asset["id"],
+            "name": asset["name"],
+            "source_type": "asset_copy",
+            "path": dst,
+            "fps": asset["fps"],
+            "frame_count": asset["frame_count"],
+            "duration_sec": asset["duration_sec"],
+            "width": asset["width"],
+            "height": asset["height"],
+        }
+    )
+
+
+def register_uploaded_video(project_id: str, filename: str, bytes_data: bytes) -> dict:
+    asset_id = new_id("asset")
+    suffix = Path(filename).suffix or ".mp4"
+    save_path = ASSETS_DIR / f"{asset_id}_{safe_name(Path(filename).stem)}{suffix}"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    save_path.write_bytes(bytes_data)
+    meta = probe_video(save_path)
+    asset = store.create_video_asset(
+        {
+            "id": asset_id,
             "name": Path(filename).stem,
             "source_type": "upload",
-            "path": save_path,
+            "original_path": filename,
+            "stored_path": save_path,
             **meta,
         }
     )
+    return _create_product_video_from_asset(project_id, asset)
 
 
 def register_imported_video(project_id: str, source_path: str, copy_to_platform: bool = False) -> dict:
     src = Path(source_path)
     if not src.exists():
         raise FileNotFoundError(f"视频不存在: {src}")
-    video_id = new_id("video")
-    if copy_to_platform:
-        dst = UPLOADS_DIR / project_id / f"{video_id}_{safe_name(src.stem)}{src.suffix}"
-        copy_file(src, dst)
-        path = dst
-        source_type = "import_copy"
-    else:
-        path = src
-        source_type = "import_ref"
-    meta = probe_video(path)
-    return store.create_video(
+    asset_id = new_id("asset")
+    stored = ASSETS_DIR / f"{asset_id}_{safe_name(src.stem)}{src.suffix}"
+    copy_file(src, stored)
+    meta = probe_video(stored)
+    asset = store.create_video_asset(
         {
-            "id": video_id,
-            "project_id": project_id,
+            "id": asset_id,
             "name": src.stem,
-            "source_type": source_type,
-            "path": path,
+            "source_type": "import_copy" if copy_to_platform else "import_ref_copy",
+            "original_path": src,
+            "stored_path": stored,
             **meta,
         }
     )
+    return _create_product_video_from_asset(project_id, asset)
 
 
 def extract_frames(video_id: str, sample_every_n_frames: int, max_frames: int = 0, jpeg_quality: int = 95) -> dict:

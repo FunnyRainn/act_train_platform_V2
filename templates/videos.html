@@ -4,28 +4,28 @@
 <section class="page-head">
   <div>
     <h1>视频与抽帧</h1>
-    <p>支持网页上传，也支持填写服务器本地视频路径导入。</p>
+    <p>视频先进入素材库，再复制到当前产品目录用于抽帧和标注。</p>
   </div>
 </section>
-<section class="grid two">
-  <form class="panel form" id="upload-form">
-    <h2>上传视频</h2>
-    <label>项目<select name="project_id"></select></label>
+<section class="panel form" id="video-flow">
+  <h2>导入素材 <button class="help-dot" type="button" data-help-key="asset_library">?</button></h2>
+  <label>产品<select id="active-project" name="project_id"></select></label>
+  <label>导入方式<select id="import-mode"><option value="upload">上传视频</option><option value="path">服务器路径导入</option></select></label>
+  <form class="form" id="upload-form">
+    <label>产品<select name="project_id"></select></label>
     <label>视频文件<input type="file" name="file" accept="video/*"></label>
     <button class="primary" type="submit">上传并登记</button>
   </form>
-  <form class="panel form" id="import-form">
-    <h2>服务器目录导入</h2>
-    <label>项目<select name="project_id"></select></label>
+  <form class="form hidden" id="import-form">
+    <label>产品<select name="project_id"></select></label>
     <label>视频路径<input name="path" placeholder="D:\videos\demo.mp4"></label>
-    <label class="inline"><input type="checkbox" name="copy_to_platform"> 复制到平台目录</label>
     <button class="primary" type="submit">导入视频</button>
   </form>
 </section>
 <section class="panel form">
   <h2>抽帧</h2>
   <div class="form-row">
-    <label>视频<select id="extract-video"></select></label>
+    <label>当前产品视频<select id="extract-video"></select></label>
     <label>每 N 帧取一帧<input id="sample-n" type="number" value="5" min="1"></label>
     <label>最大帧数<input id="max-frames" type="number" value="300" min="0"></label>
     <button id="extract-btn" class="primary">创建抽帧</button>
@@ -33,6 +33,9 @@
 </section>
 <section class="panel">
   <h2>视频列表</h2>
+  <h3>素材库</h3>
+  <div id="asset-list" class="table-list"></div>
+  <h3>当前产品视频</h3>
   <div id="video-list" class="table-list"></div>
   <h2>帧集列表</h2>
   <div id="frame-set-list" class="table-list"></div>

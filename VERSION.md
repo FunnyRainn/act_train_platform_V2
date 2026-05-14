@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.0`
+`v1.0.0.1`
 
 ## Repository
 
@@ -72,3 +72,17 @@ Future versions should focus on:
 - Multiple model deployment profiles.
 - Network-based model distribution to inference hosts.
 - Training queue isolation and GPU resource scheduling.
+
+## v1.0.0.1
+
+Customer usability upgrade:
+
+- Renames customer-facing training project wording to product-oriented configuration.
+- Adds global asset library flow and copies selected video assets into product data directories.
+- Replaces Ctrl-based label multi-select with clickable A/B/C label cards.
+- Adds unified help registry for key concepts.
+- Improves annotation workspace with selectable, draggable, resizable boxes and autosave.
+- Rewords customer UI to avoid exposing concrete model framework names.
+- Runs training in a child process so progress, stop, and partial model files can be handled.
+- Adds GPU status, progress, ETA, and training-curve data sources.
+- Exports model directories with `model_manifest.json` for whole-folder handoff to `act_server`.

@@ -15,7 +15,7 @@ from core.db import init_db
 from core.paths import PROJECT_ROOT
 
 
-app = FastAPI(title="act_train_platform", version="1.0.0.0")
+app = FastAPI(title="act_train_platform", version="1.0.0.1")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
 
@@ -82,10 +82,11 @@ def bootstrap() -> dict:
     return {
         "labels": store.list_labels(),
         "projects": store.list_projects(),
+        "video_assets": store.list_video_assets(),
         "videos": store.list_videos(),
         "frame_sets": store.list_frame_sets(),
         "datasets": store.list_dataset_versions(),
-        "train_jobs": store.list_train_jobs(),
+        "train_jobs": training_ops.list_train_jobs_with_progress(),
         "packages": store.list_model_packages(),
     }
 
@@ -119,6 +120,11 @@ async def save_project(request: Request) -> dict:
 @app.get("/api/videos")
 def list_videos(project_id: str | None = None) -> list[dict]:
     return store.list_videos(project_id)
+
+
+@app.get("/api/video-assets")
+def list_video_assets() -> list[dict]:
+    return store.list_video_assets()
 
 
 @app.post("/api/videos/upload")
@@ -260,7 +266,7 @@ async def export_dataset(request: Request) -> dict:
 
 @app.get("/api/train-jobs")
 def list_train_jobs(project_id: str | None = None) -> list[dict]:
-    return store.list_train_jobs(project_id)
+    return training_ops.list_train_jobs_with_progress(project_id)
 
 
 @app.post("/api/train-jobs")
@@ -276,6 +282,27 @@ async def create_train_job(request: Request) -> dict:
         )
     except Exception as exc:
         raise api_error(exc)
+
+
+@app.get("/api/train-jobs/{job_id}")
+def get_train_job(job_id: str) -> dict:
+    try:
+        return training_ops.get_train_job_with_progress(job_id)
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@app.post("/api/train-jobs/{job_id}/stop")
+def stop_train_job(job_id: str) -> dict:
+    try:
+        return training_ops.stop_train_job(job_id)
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@app.get("/api/gpu-status")
+def gpu_status() -> dict:
+    return training_ops.read_gpu_status()
 
 
 @app.get("/api/model-packages")

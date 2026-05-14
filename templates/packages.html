@@ -1,21 +1,21 @@
 {% extends "base.html" %}
-{% block title %}模型包 - 标注训练平台{% endblock %}
+{% block title %}模型仓库 - 标注训练平台{% endblock %}
 {% block content %}
 <section class="page-head">
   <div>
-    <h1>模型包</h1>
-    <p>模型包用于人工复制到 act_server 推理服务器。</p>
+    <h1>模型仓库 <button class="help-dot" type="button" data-help-key="model_repo">?</button></h1>
+    <p>模型目录用于整体复制到推理服务器，复制整个文件夹即可配置使用。</p>
   </div>
 </section>
 <section class="layout-two">
   <form class="panel form" id="package-form">
-    <h2>导出模型包</h2>
+    <h2>生成模型目录</h2>
     <label>训练任务<select name="train_job_id"></select></label>
-    <label>模型包名称<input name="name" value="模型包 v1"></label>
-    <button class="primary" type="submit">导出模型包</button>
+    <label>模型目录名称<input name="name" value="通用检测模型 v1"></label>
+    <button class="primary" type="submit">生成模型目录</button>
   </form>
   <section class="panel">
-    <h2>模型包列表</h2>
+    <h2>模型仓库列表</h2>
     <div id="package-list" class="table-list"></div>
   </section>
 </section>

@@ -21,9 +21,24 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS video_assets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    original_path TEXT NOT NULL,
+    stored_path TEXT NOT NULL,
+    fps REAL NOT NULL DEFAULT 0,
+    frame_count INTEGER NOT NULL DEFAULT 0,
+    duration_sec REAL NOT NULL DEFAULT 0,
+    width INTEGER NOT NULL DEFAULT 0,
+    height INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS videos (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    asset_id TEXT REFERENCES video_assets(id),
     name TEXT NOT NULL,
     source_type TEXT NOT NULL,
     path TEXT NOT NULL,
@@ -110,8 +125,10 @@ CREATE TABLE IF NOT EXISTS train_jobs (
     output_dir TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'created',
     params_json TEXT NOT NULL DEFAULT '{}',
+    progress_json TEXT NOT NULL DEFAULT '{}',
     metrics_json TEXT NOT NULL DEFAULT '{}',
     log_text TEXT NOT NULL DEFAULT '',
+    process_id INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     started_at TEXT,
     finished_at TEXT

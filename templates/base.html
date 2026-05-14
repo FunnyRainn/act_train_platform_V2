@@ -12,25 +12,34 @@
       <div class="brand-mark">AT</div>
       <div>
         <div class="brand-title">标注训练平台</div>
-        <div class="brand-subtitle">act_train_platform v1.0.0.0</div>
+        <div class="brand-subtitle">act_train_platform v1.0.0.1</div>
       </div>
     </div>
     <nav class="nav">
       <a href="/">总览</a>
       <a href="/labels">标签字典</a>
-      <a href="/projects">训练项目</a>
+      <a href="/projects">产品配置</a>
       <a href="/videos">视频与抽帧</a>
       <a href="/annotate">标注工作台</a>
-      <a href="/datasets">数据集版本</a>
-      <a href="/training">训练任务</a>
-      <a href="/packages">模型包</a>
+      <a href="/datasets">训练数据集</a>
+      <a href="/training">模型训练任务</a>
+      <a href="/packages">模型仓库</a>
     </nav>
   </aside>
   <main class="main">
     {% block content %}{% endblock %}
   </main>
   <div id="toast" class="toast"></div>
+  <div id="help-modal" class="modal-backdrop">
+    <div class="modal">
+      <button class="modal-close" type="button">关闭</button>
+      <h2 id="help-title"></h2>
+      <p id="help-body"></p>
+      <pre id="help-example"></pre>
+    </div>
+  </div>
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/help_registry.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
