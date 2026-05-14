@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}训练项目 - 标注训练平台{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>训练项目</h1>
+    <p>项目用于把产品、SOP、工位和本次训练使用的标签集合绑定在一起。</p>
+  </div>
+</section>
+<section class="layout-two">
+  <form class="panel form" id="project-form">
+    <h2>新增 / 更新项目</h2>
+    <input type="hidden" name="id">
+    <label>项目名<input name="name" required></label>
+    <label>产品名<input name="product_name"></label>
+    <label>SOP 名称<input name="sop_name"></label>
+    <label>工位名<input name="station_name"></label>
+    <label>使用标签<select name="label_codes" multiple size="10"></select></label>
+    <label>备注<textarea name="notes"></textarea></label>
+    <button class="primary" type="submit">保存项目</button>
+  </form>
+  <section class="panel">
+    <h2>项目列表</h2>
+    <div id="project-list" class="table-list"></div>
+  </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/projects.js"></script>
+{% endblock %}

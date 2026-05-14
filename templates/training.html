@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}训练任务 - 标注训练平台{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>训练任务</h1>
+    <p>训练任务会调用当前训练环境中的 Ultralytics YOLO。启动前请确认显卡和 CUDA 环境正常。</p>
+  </div>
+</section>
+<section class="layout-two">
+  <form class="panel form" id="train-form">
+    <h2>创建训练任务</h2>
+    <label>项目<select name="project_id"></select></label>
+    <label>数据集版本<select name="dataset_version_id"></select></label>
+    <label>任务名称<input name="name" value="YOLO 训练任务"></label>
+    <label>基础模型<input name="base_model_path" value="yolo11m.pt"></label>
+    <div class="form-row">
+      <label>epochs<input name="epochs" type="number" value="50"></label>
+      <label>imgsz<input name="imgsz" type="number" value="1280"></label>
+      <label>batch<input name="batch" type="number" value="8"></label>
+      <label>device<input name="device" value="0"></label>
+    </div>
+    <button class="primary" type="submit">启动训练</button>
+  </form>
+  <section class="panel">
+    <h2>训练任务列表</h2>
+    <div id="train-list" class="table-list"></div>
+  </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/training.js"></script>
+{% endblock %}

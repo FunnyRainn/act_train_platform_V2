@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}标签字典 - 标注训练平台{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>标签字典</h1>
+    <p>A 表示正常流程，B 表示异常事件，C 表示物理对象。每个标签必须写明框选对象。</p>
+  </div>
+</section>
+<section class="layout-two">
+  <form class="panel form" id="label-form">
+    <h2>新增 / 更新标签</h2>
+    <label>编码<input name="code" placeholder="C1" required></label>
+    <label>名称<input name="name" placeholder="tray"></label>
+    <label>说明<textarea name="description" placeholder="这个标签代表什么"></textarea></label>
+    <label>框选说明<textarea name="box_instruction" placeholder="标注时应该框住什么位置"></textarea></label>
+    <label class="inline"><input type="checkbox" name="enabled" checked> 启用</label>
+    <button class="primary" type="submit">保存标签</button>
+  </form>
+  <section class="panel">
+    <h2>当前标签</h2>
+    <div id="label-list" class="table-list"></div>
+  </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/labels.js"></script>
+{% endblock %}

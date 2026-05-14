@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}数据集版本 - 标注训练平台{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>数据集版本</h1>
+    <p>把已确认标注导出为不可变 YOLO 数据集版本。</p>
+  </div>
+</section>
+<section class="layout-two">
+  <form class="panel form" id="dataset-form">
+    <h2>导出数据集</h2>
+    <label>项目<select name="project_id"></select></label>
+    <label>版本名称<input name="name" value="YOLO 数据集 v1"></label>
+    <label>帧集<select name="frame_set_ids" multiple size="10"></select></label>
+    <label>混入历史数据集<select name="history_dataset_ids" multiple size="6"></select></label>
+    <button class="primary" type="submit">导出数据集版本</button>
+  </form>
+  <section class="panel">
+    <h2>数据集版本列表</h2>
+    <div id="dataset-list" class="table-list"></div>
+  </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/datasets.js"></script>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}总览 - 标注训练平台{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>模型生产总览</h1>
+    <p>这里负责从现场视频生产可交付给 act_server 的 YOLO 模型包。</p>
+  </div>
+</section>
+
+<section class="grid metrics" id="metrics"></section>
+
+<section class="panel">
+  <h2>推荐流程</h2>
+  <div class="steps">
+    <div>1. 建标签字典并写清楚框选说明</div>
+    <div>2. 创建训练项目并选择标签</div>
+    <div>3. 导入视频并抽帧</div>
+    <div>4. 标注关键帧，必要时插值或预标注</div>
+    <div>5. 导出 YOLO 数据集版本</div>
+    <div>6. 启动训练并导出模型包</div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+loadBootstrap().then(data => {
+  const items = [
+    ['标签', data.labels.length],
+    ['项目', data.projects.length],
+    ['视频', data.videos.length],
+    ['帧集', data.frame_sets.length],
+    ['数据集', data.datasets.length],
+    ['训练任务', data.train_jobs.length],
+    ['模型包', data.packages.length],
+  ];
+  document.querySelector('#metrics').innerHTML = items.map(([name, value]) => `
+    <div class="metric"><span>${name}</span><strong>${value}</strong></div>
+  `).join('');
+});
+</script>
+{% endblock %}

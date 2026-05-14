@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}标注工作台 - 标注训练平台{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <h1>标注工作台</h1>
+    <p>画框、保存关键帧、绑定轨迹，然后对中间帧做线性插值。</p>
+  </div>
+</section>
+<section class="annotator">
+  <aside class="panel annotator-side">
+    <label>帧集<select id="frame-set-select"></select></label>
+    <label>标签<select id="label-select"></select></label>
+    <label>轨迹 ID<input id="track-id" placeholder="留空则创建新轨迹"></label>
+    <label class="inline"><input type="checkbox" id="is-keyframe"> 当前框为关键帧</label>
+    <button id="new-track-btn">创建/获取轨迹</button>
+    <button id="save-frame-btn" class="primary">保存当前帧</button>
+    <button id="interpolate-btn">按轨迹插值</button>
+    <button id="clear-boxes-btn">清空当前画面框</button>
+    <hr>
+    <label>旧模型路径<input id="prelabel-model" placeholder="D:\models\best.pt"></label>
+    <button id="prelabel-btn">运行预标注</button>
+    <div id="box-list" class="box-list"></div>
+  </aside>
+  <section class="panel annotator-main">
+    <div class="frame-toolbar">
+      <button id="prev-frame">上一帧</button>
+      <span id="frame-info">未选择帧</span>
+      <button id="next-frame">下一帧</button>
+    </div>
+    <div class="canvas-wrap">
+      <img id="frame-image" alt="当前帧">
+      <canvas id="bbox-canvas"></canvas>
+    </div>
+  </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/annotate.js"></script>
+{% endblock %}

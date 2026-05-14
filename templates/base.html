@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}标注训练平台{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AT</div>
+      <div>
+        <div class="brand-title">标注训练平台</div>
+        <div class="brand-subtitle">act_train_platform v1.0.0.0</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/">总览</a>
+      <a href="/labels">标签字典</a>
+      <a href="/projects">训练项目</a>
+      <a href="/videos">视频与抽帧</a>
+      <a href="/annotate">标注工作台</a>
+      <a href="/datasets">数据集版本</a>
+      <a href="/training">训练任务</a>
+      <a href="/packages">模型包</a>
+    </nav>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
