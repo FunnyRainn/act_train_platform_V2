@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.2`
+`v1.0.0.3`
 
 ## Repository
 
@@ -97,3 +97,13 @@ Customer usability and model repository cleanup:
 - Automatically creates a deployable model directory when a finished or stopped training job has `best.pt` or `last.pt`.
 - Changes the model repository into a read-only repository view instead of a manual model-directory generation step.
 - Improves the overview page with clearer workflow entry cards.
+
+## v1.0.0.3
+
+Customer-facing wording and navigation cleanup:
+
+- Adds active state to the left navigation so users can see the current page.
+- Adds dark/light theme switching and aligns colors more closely with `act_web`.
+- Renames the customer-visible `SOP 名称` field to `流程说明`; the underlying database field remains `sop_name` for compatibility.
+- Clarifies that training product flow text is only traceability metadata and does not participate in SOP judgement.
+- Keeps help buttons inline with field labels, including the target-label help button.

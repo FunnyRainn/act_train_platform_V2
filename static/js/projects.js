@@ -35,7 +35,7 @@ async function refreshProjects() {
   renderLabelCards();
   $("#project-list").innerHTML = data.projects.map(project => rowHtml(
     esc(project.name),
-    `产品: ${esc(project.product_name || "-")} | SOP: ${esc(project.sop_name || "-")} | 标签: ${esc(project.label_codes.join(", ") || "-")}`,
+    `产品: ${esc(project.product_name || "-")} | 流程说明: ${esc(project.sop_name || "-")} | 标签: ${esc(project.label_codes.join(", ") || "-")}`,
     `<button data-id="${esc(project.id)}">编辑</button>`
   )).join("");
   $$("#project-list button").forEach(btn => {

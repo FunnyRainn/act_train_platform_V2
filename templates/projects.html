@@ -4,7 +4,7 @@
 <section class="page-head">
   <div>
     <h1>产品配置 <button class="help-dot" data-help-key="product">?</button></h1>
-    <p>产品配置用于把产品、SOP、工位和本次训练使用的标签集合绑定在一起。</p>
+    <p>产品配置用于追溯训练数据来源和本次训练使用的标签集合；真正的 SOP 顺序仍在 act_web 的策略配置中设置。</p>
   </div>
 </section>
 <section class="layout-two">
@@ -13,9 +13,9 @@
     <input type="hidden" name="id">
     <label>配置名称<input name="name" required></label>
     <label>产品名<input name="product_name"></label>
-    <label>SOP 名称<input name="sop_name"></label>
+    <label>流程说明<input name="sop_name" placeholder="仅用于追溯训练数据来源，不参与 SOP 判定"></label>
     <label>工位名<input name="station_name"></label>
-    <label>目标标签 <button class="help-dot" type="button" data-help-key="label_cards">?</button></label>
+    <label><span class="label-title">目标标签 <button class="help-dot" type="button" data-help-key="label_cards">?</button></span></label>
     <div id="label-card-list" class="label-card-list"></div>
     <label>备注<textarea name="notes"></textarea></label>
     <button class="primary" type="submit">保存产品配置</button>

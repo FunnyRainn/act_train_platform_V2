@@ -101,6 +101,12 @@ function showHelp(key) {
   $("#help-modal").classList.add("show");
 }
 
+function applyTheme(theme) {
+  const normalized = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = normalized;
+  localStorage.setItem("act_train_theme", normalized);
+}
+
 document.addEventListener("click", event => {
   const help = event.target.closest("[data-help-key]");
   if (help) {
@@ -111,3 +117,12 @@ document.addEventListener("click", event => {
     $("#help-modal").classList.remove("show");
   }
 });
+
+applyTheme(localStorage.getItem("act_train_theme") || "light");
+const themeToggle = $("#theme-toggle");
+if (themeToggle) {
+  themeToggle.onclick = () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+  };
+}

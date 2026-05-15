@@ -15,7 +15,7 @@ from core.db import init_db
 from core.paths import PROJECT_ROOT
 
 
-app = FastAPI(title="act_train_platform", version="1.0.0.2")
+app = FastAPI(title="act_train_platform", version="1.0.0.3")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
 
@@ -26,6 +26,7 @@ def on_startup() -> None:
 
 
 def page(request: Request, template: str, **context: Any) -> HTMLResponse:
+    context.setdefault("version", "v1.0.0.3")
     return templates.TemplateResponse(request, template, context)
 
 
@@ -39,42 +40,42 @@ def api_error(exc: Exception) -> HTTPException:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
-    return page(request, "index.html")
+    return page(request, "index.html", page_id="overview")
 
 
 @app.get("/labels", response_class=HTMLResponse)
 def labels_page(request: Request) -> HTMLResponse:
-    return page(request, "labels.html")
+    return page(request, "labels.html", page_id="labels")
 
 
 @app.get("/projects", response_class=HTMLResponse)
 def projects_page(request: Request) -> HTMLResponse:
-    return page(request, "projects.html")
+    return page(request, "projects.html", page_id="projects")
 
 
 @app.get("/videos", response_class=HTMLResponse)
 def videos_page(request: Request) -> HTMLResponse:
-    return page(request, "videos.html")
+    return page(request, "videos.html", page_id="videos")
 
 
 @app.get("/annotate", response_class=HTMLResponse)
 def annotate_page(request: Request) -> HTMLResponse:
-    return page(request, "annotate.html")
+    return page(request, "annotate.html", page_id="annotate")
 
 
 @app.get("/datasets", response_class=HTMLResponse)
 def datasets_page(request: Request) -> HTMLResponse:
-    return page(request, "datasets.html")
+    return page(request, "datasets.html", page_id="datasets")
 
 
 @app.get("/training", response_class=HTMLResponse)
 def training_page(request: Request) -> HTMLResponse:
-    return page(request, "training.html")
+    return page(request, "training.html", page_id="training")
 
 
 @app.get("/packages", response_class=HTMLResponse)
 def packages_page(request: Request) -> HTMLResponse:
-    return page(request, "packages.html")
+    return page(request, "packages.html", page_id="packages")
 
 
 @app.get("/api/bootstrap")

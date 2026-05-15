@@ -1,5 +1,12 @@
 # act_train_platform
 
+## v1.0.0.3 Notes
+
+- Left navigation now highlights the current page.
+- The platform supports dark/light theme switching.
+- Product configuration now shows `流程说明` instead of `SOP 名称`; it is only traceability metadata and does not participate in production SOP judgement.
+- Target-label help stays inline with the field name.
+
 ## v1.0.0.2 Notes
 
 - Training forms keep the selected product, dataset, and task fields while the page refreshes.
@@ -22,8 +29,8 @@
 - 在网页中标注 bbox。
 - 使用关键帧和轨迹插值降低重复标注工作量。
 - 使用旧模型进行可选预标注。
-- 导出 YOLO 数据集版本。
-- 启动 YOLO 训练。
+- 导出训练数据集版本。
+- 启动通用检测模型训练。
 - 导出可人工复制到 `act_server` 的模型包。
 
 它不负责实时推理、不负责摄像头会话、不负责 SOP 报警、不负责 AOI 运行时规则。
@@ -58,7 +65,7 @@ http://127.0.0.1:18100/
 4. 创建抽帧任务，得到可标注帧集。
 5. 在“标注工作台”中标注关键帧，使用插值生成中间帧。
 6. 可选：选择旧模型执行预标注，再人工确认。
-7. 在“数据集版本”中导出 YOLO 数据集。
+7. 在“训练数据集”中导出训练数据集版本。
 8. 在“训练任务”中创建训练任务。
 9. 训练完成后在“模型包”中导出标准模型包。
 10. 人工复制模型包到 `act_server` 推理服务器。
@@ -67,9 +74,11 @@ http://127.0.0.1:18100/
 
 ```text
 model_package/
+├── model_manifest.json
 ├── best.pt
+├── last.pt
 ├── labels.yaml
-├── package.json
+├── label_policy.json
 ├── train_report.json
 ├── dataset_version.json
 └── preview_examples/
