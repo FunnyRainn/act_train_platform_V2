@@ -4,26 +4,26 @@
 <section class="page-head">
   <div>
     <h1>模型训练任务 <button class="help-dot" type="button" data-help-key="training">?</button></h1>
-    <p>训练任务会调用当前训练环境中的通用检测模型训练程序。启动前请确认显卡环境正常。</p>
+    <p>选择产品和训练数据集后启动训练。训练完成或停止后，系统会自动把可用模型整理到模型仓库。</p>
   </div>
 </section>
 <section class="layout-two">
   <form class="panel form" id="train-form">
-    <h2>创建模型训练任务</h2>
+    <h2>创建模型训练任务 <button class="help-dot" type="button" data-help-key="training_form">?</button></h2>
     <label>产品<select name="project_id"></select></label>
     <label>训练数据集<select name="dataset_version_id"></select></label>
     <label>任务名称<input name="name" value="模型训练任务"></label>
     <label>基础模型路径<input name="base_model_path" value="yolo11m.pt"></label>
     <div class="form-row">
-      <label>epochs<input name="epochs" type="number" value="50"></label>
-      <label>imgsz<input name="imgsz" type="number" value="1280"></label>
-      <label>batch<input name="batch" type="number" value="8"></label>
-      <label>device<input name="device" value="0"></label>
+      <label>训练轮数<input name="epochs" type="number" value="50"></label>
+      <label>输入尺寸<input name="imgsz" type="number" value="1280"></label>
+      <label>批次大小<input name="batch" type="number" value="8"></label>
+      <label>设备编号<input name="device" value="0"></label>
     </div>
     <button class="primary" type="submit">启动训练</button>
   </form>
   <section class="panel">
-    <h2>训练任务列表</h2>
+    <h2>训练任务列表 <button class="help-dot" type="button" data-help-key="training_chart">?</button></h2>
     <div id="gpu-status" class="gpu-status"></div>
     <div id="train-list" class="table-list"></div>
   </section>

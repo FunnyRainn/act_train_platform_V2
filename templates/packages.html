@@ -4,20 +4,15 @@
 <section class="page-head">
   <div>
     <h1>模型仓库 <button class="help-dot" type="button" data-help-key="model_repo">?</button></h1>
-    <p>模型目录用于整体复制到推理服务器，复制整个文件夹即可配置使用。</p>
+    <p>这里保存历史训练产生的可部署模型目录。复制整个目录到推理服务器后，在推理服务配置中指向该目录即可。</p>
   </div>
 </section>
-<section class="layout-two">
-  <form class="panel form" id="package-form">
-    <h2>生成模型目录</h2>
-    <label>训练任务<select name="train_job_id"></select></label>
-    <label>模型目录名称<input name="name" value="通用检测模型 v1"></label>
-    <button class="primary" type="submit">生成模型目录</button>
-  </form>
-  <section class="panel">
-    <h2>模型仓库列表</h2>
-    <div id="package-list" class="table-list"></div>
-  </section>
+<section class="panel">
+  <h2>模型仓库列表</h2>
+  <div class="notice">
+    模型目录由训练任务自动生成。训练完成或手动停止后，只要已经产生可用模型文件，系统会自动整理到这里。
+  </div>
+  <div id="package-list" class="table-list"></div>
 </section>
 {% endblock %}
 {% block scripts %}

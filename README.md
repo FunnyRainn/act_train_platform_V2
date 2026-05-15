@@ -1,5 +1,13 @@
 # act_train_platform
 
+## v1.0.0.2 Notes
+
+- Training forms keep the selected product, dataset, and task fields while the page refreshes.
+- Training charts show visible legends and help text.
+- Finished or stopped training jobs automatically create deployable model directories when model files exist.
+- The model repository is now a repository view; operators no longer need to manually generate the model directory.
+- The overview page shows the full production flow from labels to model repository.
+
 行为检测项目的标注训练平台。
 
 这个项目是“模型生产端”，面向客户的集中训练服务器。它和产线实时使用的 `act_web`、推理服务 `act_server` 分开部署。

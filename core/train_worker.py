@@ -40,7 +40,7 @@ def run(job_id: str) -> None:
             status="finished",
             finished_at=now_text(),
             metrics_json=json_dumps({"result_type": type(result).__name__, "train_kwargs": train_kwargs}),
-            log_text="模型训练完成，可到模型仓库生成模型目录。",
+            log_text="模型训练完成，系统会自动整理到模型仓库。",
             process_id=0,
         )
     except Exception as exc:

@@ -58,7 +58,13 @@ def stop_train_job(job_id: str) -> dict:
             subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, text=True)
         else:
             os.kill(pid, 15)
-    store.update_train_job(job_id, status="stopped", finished_at=now_text(), log_text=(job.get("log_text") or "") + "\n用户已停止训练。")
+    store.update_train_job(
+        job_id,
+        status="stopped",
+        finished_at=now_text(),
+        log_text=(job.get("log_text") or "") + "\n用户已停止训练。",
+        process_id=0,
+    )
     return get_train_job_with_progress(job_id)
 
 
@@ -85,11 +91,33 @@ def _read_results_csv(job: dict) -> tuple[list[dict[str, Any]], dict[str, Any]]:
             rows.append(cleaned)
     if not rows:
         return [], {}
-    last = rows[-1]
-    return rows, last
+    return rows, rows[-1]
 
 
-def get_train_job_with_progress(job_id: str) -> dict:
+def _available_model_files(job: dict) -> dict[str, str]:
+    weights_dir = Path(job["output_dir"]) / "train" / "weights"
+    files: dict[str, str] = {}
+    for name in ["best.pt", "last.pt"]:
+        path = weights_dir / name
+        if path.exists():
+            files[name] = str(path)
+    return files
+
+
+def _existing_package_for_job(train_job_id: str) -> dict[str, Any] | None:
+    for package in store.list_model_packages():
+        if package.get("train_job_id") == train_job_id:
+            return package
+    return None
+
+
+def _default_package_name(job: dict[str, Any]) -> str:
+    project = store.get_project(job["project_id"])
+    product_name = project.get("product_name") or project.get("name") or "通用检测模型"
+    return f"{product_name}-{job.get('name') or job['id']}"
+
+
+def get_train_job_with_progress(job_id: str, auto_package: bool = True) -> dict:
     job = store.get_train_job(job_id)
     rows, last = _read_results_csv(job)
     total = int(job["params"].get("epochs") or job.get("progress", {}).get("total_epochs") or 0)
@@ -110,6 +138,11 @@ def get_train_job_with_progress(job_id: str) -> dict:
         "series": rows[-200:],
         "model_files": model_files,
     }
+    if auto_package and job.get("status") in {"finished", "stopped"} and model_files:
+        try:
+            job["model_package"] = ensure_model_package_for_job(job_id)
+        except Exception as exc:
+            job["model_package_error"] = str(exc)
     return job
 
 
@@ -117,14 +150,16 @@ def list_train_jobs_with_progress(project_id: str | None = None) -> list[dict]:
     return [get_train_job_with_progress(job["id"]) for job in store.list_train_jobs(project_id)]
 
 
-def _available_model_files(job: dict) -> dict[str, str]:
-    weights_dir = Path(job["output_dir"]) / "train" / "weights"
-    files: dict[str, str] = {}
-    for name in ["best.pt", "last.pt"]:
-        path = weights_dir / name
-        if path.exists():
-            files[name] = str(path)
-    return files
+def ensure_model_package_for_job(job_id: str) -> dict[str, Any] | None:
+    job = get_train_job_with_progress(job_id, auto_package=False)
+    if job.get("status") not in {"finished", "stopped"}:
+        return None
+    if not (job.get("progress", {}).get("model_files") or {}):
+        return None
+    existing = _existing_package_for_job(job_id)
+    if existing:
+        return existing
+    return export_model_package(job_id, _default_package_name(job), auto_package=False)
 
 
 def read_gpu_status() -> dict:
@@ -158,12 +193,15 @@ def read_gpu_status() -> dict:
         return {"ok": False, "error": str(exc), "gpus": []}
 
 
-def export_model_package(train_job_id: str, name: str) -> dict:
-    job = get_train_job_with_progress(train_job_id)
+def export_model_package(train_job_id: str, name: str, auto_package: bool = True) -> dict:
+    existing = _existing_package_for_job(train_job_id)
+    if existing:
+        return existing
+    job = get_train_job_with_progress(train_job_id, auto_package=auto_package)
     model_files = job["progress"].get("model_files") or {}
     selected = model_files.get("best.pt") or model_files.get("last.pt")
     if not selected:
-        raise FileNotFoundError("当前训练任务没有可用模型文件，不能生成模型包。")
+        raise FileNotFoundError("当前训练任务没有可用模型文件，不能生成模型目录。")
     dataset = store.get_dataset_version(job["dataset_version_id"])
     project = store.get_project(job["project_id"])
     package_id = new_id("package")

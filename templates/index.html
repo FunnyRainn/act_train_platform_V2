@@ -1,42 +1,69 @@
 {% extends "base.html" %}
 {% block title %}总览 - 标注训练平台{% endblock %}
 {% block content %}
-<section class="page-head">
+<section class="hero-dashboard">
   <div>
     <h1>模型生产总览</h1>
-    <p>这里负责从现场视频生产可交付给推理服务的通用检测模型目录。</p>
+    <p>从现场视频到可部署模型目录的集中工作台。先准备标签和产品，再导入视频、抽帧标注、导出训练数据集，最后启动训练并交付模型目录。</p>
   </div>
+  <a class="button-link hero-action" href="/videos">导入视频</a>
 </section>
 
 <section class="grid metrics" id="metrics"></section>
 
-<section class="panel">
-  <h2>推荐流程</h2>
-  <div class="steps">
-    <div>1. 建标签字典并写清楚框选说明</div>
-    <div>2. 创建产品配置并选择标签</div>
-    <div>3. 导入视频并抽帧</div>
-    <div>4. 标注关键帧，必要时插值或预标注</div>
-    <div>5. 导出训练数据集版本</div>
-    <div>6. 启动训练并生成模型目录</div>
-  </div>
+<section class="overview-grid">
+  <a class="overview-card" href="/labels">
+    <span>01</span>
+    <strong>标签字典</strong>
+    <p>维护 A/B/C 标签和框选说明。</p>
+  </a>
+  <a class="overview-card" href="/projects">
+    <span>02</span>
+    <strong>产品配置</strong>
+    <p>绑定产品、SOP、工位和目标标签。</p>
+  </a>
+  <a class="overview-card" href="/videos">
+    <span>03</span>
+    <strong>视频与抽帧</strong>
+    <p>导入现场视频并生成可标注帧集。</p>
+  </a>
+  <a class="overview-card" href="/annotate">
+    <span>04</span>
+    <strong>标注工作台</strong>
+    <p>画框、关键帧、跟踪对象和插值。</p>
+  </a>
+  <a class="overview-card" href="/datasets">
+    <span>05</span>
+    <strong>训练数据集</strong>
+    <p>把确认标注整理成不可变训练版本。</p>
+  </a>
+  <a class="overview-card" href="/training">
+    <span>06</span>
+    <strong>模型训练</strong>
+    <p>查看进度、显存、曲线和模型产出。</p>
+  </a>
+  <a class="overview-card" href="/packages">
+    <span>07</span>
+    <strong>模型仓库</strong>
+    <p>复制完整模型目录到推理服务器。</p>
+  </a>
 </section>
 {% endblock %}
 {% block scripts %}
 <script>
 loadBootstrap().then(data => {
   const items = [
-    ['标签', data.labels.length],
-    ['产品', data.projects.length],
-    ['视频', data.videos.length],
-    ['帧集', data.frame_sets.length],
-    ['训练数据集', data.datasets.length],
-    ['训练任务', data.train_jobs.length],
-    ['模型仓库', data.packages.length],
+    ["标签", data.labels.length],
+    ["产品", data.projects.length],
+    ["视频", data.videos.length],
+    ["帧集", data.frame_sets.length],
+    ["训练数据集", data.datasets.length],
+    ["训练任务", data.train_jobs.length],
+    ["模型仓库", data.packages.length],
   ];
-  document.querySelector('#metrics').innerHTML = items.map(([name, value]) => `
+  document.querySelector("#metrics").innerHTML = items.map(([name, value]) => `
     <div class="metric"><span>${name}</span><strong>${value}</strong></div>
-  `).join('');
+  `).join("");
 });
 </script>
 {% endblock %}

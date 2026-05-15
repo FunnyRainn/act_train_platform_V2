@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.1`
+`v1.0.0.2`
 
 ## Repository
 
@@ -86,3 +86,14 @@ Customer usability upgrade:
 - Runs training in a child process so progress, stop, and partial model files can be handled.
 - Adds GPU status, progress, ETA, and training-curve data sources.
 - Exports model directories with `model_manifest.json` for whole-folder handoff to `act_server`.
+
+## v1.0.0.2
+
+Customer usability and model repository cleanup:
+
+- Keeps selected product, dataset, and task fields stable while the training page auto-refreshes.
+- Adds visible chart legends and help text for training curves.
+- Keeps help text in the central help registry and fixes the tracking-object help button layout.
+- Automatically creates a deployable model directory when a finished or stopped training job has `best.pt` or `last.pt`.
+- Changes the model repository into a read-only repository view instead of a manual model-directory generation step.
+- Improves the overview page with clearer workflow entry cards.

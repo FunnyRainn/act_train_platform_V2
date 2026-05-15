@@ -15,7 +15,7 @@ from core.db import init_db
 from core.paths import PROJECT_ROOT
 
 
-app = FastAPI(title="act_train_platform", version="1.0.0.1")
+app = FastAPI(title="act_train_platform", version="1.0.0.2")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
 

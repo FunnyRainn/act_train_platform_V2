@@ -1,3 +1,9 @@
+const SERIES_DEFS = [
+  { id: "train_loss", label: "训练误差", color: "#2866d6", keys: ["train/box_loss", "box_loss"] },
+  { id: "val_loss", label: "验证误差", color: "#e07a2f", keys: ["val/box_loss"] },
+  { id: "score", label: "综合评分", color: "#197a4b", keys: ["metrics/mAP50(B)", "metrics/mAP50"] },
+];
+
 function metricValue(row, candidates) {
   for (const key of candidates) {
     if (row[key] !== undefined && row[key] !== "") return Number(row[key]);
@@ -19,12 +25,7 @@ function drawChart(canvas, rows) {
     ctx.lineTo(width, y);
     ctx.stroke();
   }
-  const seriesDefs = [
-    { color: "#2866d6", keys: ["train/box_loss", "box_loss"] },
-    { color: "#e07a2f", keys: ["val/box_loss"] },
-    { color: "#197a4b", keys: ["metrics/mAP50(B)", "metrics/mAP50"] },
-  ];
-  for (const def of seriesDefs) {
+  for (const def of SERIES_DEFS) {
     const points = rows.map((row, idx) => ({ idx, value: metricValue(row, def.keys) })).filter(p => Number.isFinite(p.value));
     if (points.length < 2) continue;
     const min = Math.min(...points.map(p => p.value));
@@ -41,22 +42,73 @@ function drawChart(canvas, rows) {
   }
 }
 
-async function refreshTraining() {
-  const data = await loadBootstrap();
+function captureTrainFormState() {
+  const form = $("#train-form");
+  return {
+    project_id: form.project_id.value,
+    dataset_version_id: form.dataset_version_id.value,
+    name: form.name.value,
+    base_model_path: form.base_model_path.value,
+    epochs: form.epochs.value,
+    imgsz: form.imgsz.value,
+    batch: form.batch.value,
+    device: form.device.value,
+    activeName: document.activeElement?.name || "",
+  };
+}
+
+function restoreTrainFormState(state) {
+  const form = $("#train-form");
+  for (const [key, value] of Object.entries(state)) {
+    if (key === "activeName") continue;
+    if (form[key] && value !== undefined) form[key].value = value;
+  }
+  if (state.activeName && form[state.activeName] && document.activeElement === document.body) {
+    form[state.activeName].focus();
+  }
+}
+
+function fillTrainSelects(data, state) {
   fillSelect($("#train-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
   fillSelect($("#train-form select[name=dataset_version_id]"), data.datasets, item => item.id, item => `${item.name} (${item.status})`, "选择训练数据集");
+  restoreTrainFormState(state);
+}
+
+function statusText(status) {
+  const map = {
+    queued: "排队中",
+    running: "训练中",
+    stopped: "已停止",
+    finished: "已完成",
+    failed: "失败",
+  };
+  return map[status] || status || "-";
+}
+
+async function refreshTraining() {
+  const state = captureTrainFormState();
+  const data = await loadBootstrap();
+  fillTrainSelects(data, state);
   await renderGpuStatus();
   $("#train-list").innerHTML = data.train_jobs.map(job => {
     const p = job.progress || {};
     const canStop = job.status === "running" || job.status === "queued";
-    const hasModel = p.model_files && Object.keys(p.model_files).length > 0;
+    const modelPackage = job.model_package;
+    const hasModel = modelPackage || (p.model_files && Object.keys(p.model_files).length > 0);
+    const packageText = modelPackage
+      ? `模型目录已生成: ${esc(modelPackage.package_dir)}`
+      : hasModel
+        ? "检测到模型文件，正在整理到模型仓库"
+        : "尚未产生可用模型";
     return rowHtml(
       esc(job.name),
       `
-        状态: ${esc(job.status)} | 进度: ${p.current_epoch || 0}/${p.total_epochs || "-"} | 预计剩余: ${secondsText(p.eta_seconds)}
+        状态: ${esc(statusText(job.status))} | 进度: ${p.current_epoch || 0}/${p.total_epochs || "-"} | 预计剩余: ${secondsText(p.eta_seconds)}
         <div class="progress-shell"><div class="progress-fill" style="width:${Number(p.percent || 0)}%"></div></div>
-        输出: ${esc(job.output_dir)}<br>${esc(job.log_text || "")}
+        <div class="row-meta">${packageText}</div>
+        <div class="chart-legend">${SERIES_DEFS.map(def => `<span><i style="background:${def.color}"></i>${def.label}</span>`).join("")}</div>
         <canvas class="chart" data-job="${esc(job.id)}"></canvas>
+        <div class="row-meta">${esc(job.log_text || "")}</div>
       `,
       `
         ${canStop ? `<button data-stop="${esc(job.id)}">停止</button>` : ""}
@@ -72,7 +124,7 @@ async function refreshTraining() {
     btn.onclick = async () => {
       try {
         await apiPost(`/api/train-jobs/${btn.dataset.stop}/stop`, {});
-        showToast("训练停止命令已发送");
+        showToast("训练停止命令已发送，若已有模型文件会自动整理到模型仓库。");
         await refreshTraining();
       } catch (error) {
         showToast(error.message, "error");
@@ -85,7 +137,7 @@ async function renderGpuStatus() {
   const gpu = await apiGet("/api/gpu-status");
   $("#gpu-status").innerHTML = gpu.ok
     ? gpu.gpus.map(item => `显卡: ${esc(item.name)} | 显存 ${item.memory_used_mb}/${item.memory_total_mb} MB | 利用率 ${item.utilization_gpu}%`).join("<br>")
-    : `显卡状态不可用：${esc(gpu.error || "")}`;
+    : `显卡状态不可用: ${esc(gpu.error || "")}`;
 }
 
 $("#train-form").addEventListener("submit", async event => {
@@ -104,7 +156,7 @@ $("#train-form").addEventListener("submit", async event => {
         device: form.device.value,
       },
     });
-    showToast("模型训练任务已创建，后台开始运行");
+    showToast("模型训练任务已创建，后台开始运行。");
     await refreshTraining();
   } catch (error) {
     showToast(error.message, "error");

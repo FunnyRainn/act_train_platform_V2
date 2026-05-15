@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-head">
   <div>
-    <h1>标注工作台</h1>
+    <h1>标注工作台 <button class="help-dot" type="button" data-help-key="annotation_workspace">?</button></h1>
     <p>画框、调整框、标记关键帧，并用跟踪对象生成中间帧。</p>
   </div>
 </section>
@@ -11,15 +11,21 @@
   <aside class="panel annotator-side">
     <label>帧集<select id="frame-set-select"></select></label>
     <label>标签<select id="label-select"></select></label>
-    <label>跟踪对象 <button class="help-dot" type="button" data-help-key="track_object">?</button><input id="track-id" placeholder="留空后点击新建跟踪对象"></label>
+    <label>
+      <span class="label-title">跟踪对象 <button class="help-dot" type="button" data-help-key="track_object">?</button></span>
+      <input id="track-id" placeholder="留空后点击新建跟踪对象">
+    </label>
     <label class="inline"><input type="checkbox" id="is-keyframe"> 当前框为关键帧</label>
     <button id="new-track-btn">新建跟踪对象</button>
     <button id="save-frame-btn" class="primary">手动保存</button>
-    <button id="interpolate-btn">生成中间帧</button>
+    <button id="interpolate-btn">生成中间帧 <span class="inline-help" data-help-key="interpolate_frames">?</span></button>
     <button id="clear-boxes-btn">清空当前画面框</button>
     <div id="save-status" class="row-meta">自动保存就绪</div>
     <hr>
-    <label>旧模型路径<input id="prelabel-model" placeholder="D:\models\best.pt"></label>
+    <label>
+      <span class="label-title">旧模型路径 <button class="help-dot" type="button" data-help-key="prelabel">?</button></span>
+      <input id="prelabel-model" placeholder="D:\models\best.pt">
+    </label>
     <button id="prelabel-btn">运行预标注</button>
     <div id="box-list" class="box-list"></div>
   </aside>
