@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.4`
+`v1.0.0.5`
 
 ## Repository
 
@@ -116,3 +116,10 @@ Dataset export and pre-labeling convenience update:
 - Records dataset export mode in the dataset summary for traceability.
 - Adds a configurable pre-label confidence threshold in the annotation workspace.
 - Validates pre-label confidence on both the page and backend.
+
+## v1.0.0.5
+
+Annotation workspace shortcut update:
+
+- Adds `A` / `D` keyboard shortcuts for previous-frame and next-frame navigation.
+- Keeps shortcuts disabled while typing in inputs, selects, textareas, or editable fields.

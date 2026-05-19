@@ -362,6 +362,23 @@ $("#prelabel-btn").addEventListener("click", async () => {
   }
 });
 
+function isTypingTarget(target) {
+  const tagName = target?.tagName?.toLowerCase();
+  return target?.isContentEditable || ["input", "select", "textarea"].includes(tagName);
+}
+
+document.addEventListener("keydown", event => {
+  if (isTypingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "a") {
+    event.preventDefault();
+    $("#prev-frame").click();
+  } else if (key === "d") {
+    event.preventDefault();
+    $("#next-frame").click();
+  }
+});
+
 window.addEventListener("resize", () => {
   if (image.complete && image.style.display !== "none") {
     fitCanvas();
