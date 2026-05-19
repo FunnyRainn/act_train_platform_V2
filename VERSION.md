@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.5`
+`v1.0.0.6`
 
 ## Repository
 
@@ -123,3 +123,11 @@ Annotation workspace shortcut update:
 
 - Adds `A` / `D` keyboard shortcuts for previous-frame and next-frame navigation.
 - Keeps shortcuts disabled while typing in inputs, selects, textareas, or editable fields.
+
+## v1.0.0.6
+
+Annotation shortcut reliability fix:
+
+- Allows `A` / `D` frame shortcuts to work when focus remains on the frame-set or label select.
+- Keeps shortcuts disabled while typing in text inputs, textareas, or editable fields.
+- Uses physical key codes as the primary shortcut signal with key-value fallback.
