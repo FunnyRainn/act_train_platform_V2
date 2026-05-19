@@ -260,6 +260,7 @@ async def export_dataset(request: Request) -> dict:
             payload.get("name") or "数据集版本",
             payload.get("frame_set_ids") or [],
             payload.get("history_dataset_ids") or [],
+            bool(payload.get("annotated_only")),
         )
     except Exception as exc:
         raise api_error(exc)

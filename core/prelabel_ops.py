@@ -10,6 +10,10 @@ def run_prelabel(frame_set_id: str, model_path: str, conf: float = 0.25) -> dict
     """Run YOLO pre-labeling and store detections as unconfirmed annotations."""
     from ultralytics import YOLO
 
+    conf = float(conf)
+    if conf < 0.05 or conf > 0.95:
+        raise ValueError("预标注置信度需要在 0.05 到 0.95 之间")
+
     frame_set = store.get_frame_set(frame_set_id)
     project = store.get_project(frame_set["project_id"])
     label_codes = project["label_codes"]

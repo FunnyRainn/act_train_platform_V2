@@ -26,6 +26,10 @@
       <span class="label-title">旧模型路径 <button class="help-dot" type="button" data-help-key="prelabel">?</button></span>
       <input id="prelabel-model" placeholder="D:\models\best.pt">
     </label>
+    <label>
+      <span class="label-title">预标注置信度 <button class="help-dot" type="button" data-help-key="prelabel_confidence">?</button></span>
+      <input id="prelabel-conf" type="number" min="0.05" max="0.95" step="0.05" value="0.25">
+    </label>
     <button id="prelabel-btn">运行预标注</button>
     <div id="box-list" class="box-list"></div>
   </aside>

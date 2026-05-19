@@ -18,7 +18,13 @@ def _yolo_line(class_id: int, ann: dict) -> str:
     return f"{class_id} {x_center:.6f} {y_center:.6f} {float(ann['w']):.6f} {float(ann['h']):.6f}"
 
 
-def export_dataset(project_id: str, name: str, frame_set_ids: list[str], history_dataset_ids: list[str] | None = None) -> dict:
+def export_dataset(
+    project_id: str,
+    name: str,
+    frame_set_ids: list[str],
+    history_dataset_ids: list[str] | None = None,
+    annotated_only: bool = False,
+) -> dict:
     project = store.get_project(project_id)
     label_codes = unique_keep_order(project["label_codes"])
     if not label_codes:
@@ -49,7 +55,15 @@ def export_dataset(project_id: str, name: str, frame_set_ids: list[str], history
     split_map.update({frame_id: "val" for frame_id in val_ids})
     split_map.update({frame_id: "test" for frame_id in test_ids})
 
-    counts = {"train": 0, "val": 0, "test": 0, "boxes": 0, "skipped_unconfirmed": 0}
+    counts = {
+        "train": 0,
+        "val": 0,
+        "test": 0,
+        "boxes": 0,
+        "skipped_unconfirmed": 0,
+        "skipped_unannotated": 0,
+        "export_mode": "annotated_only" if annotated_only else "confirmed_annotations",
+    }
     for frame_id, split in split_map.items():
         frame = frame_lookup[frame_id]
         anns = [
@@ -58,6 +72,7 @@ def export_dataset(project_id: str, name: str, frame_set_ids: list[str], history
             if ann["confirmed"] and ann["label_code"] in class_map
         ]
         if not anns:
+            counts["skipped_unannotated"] += 1
             continue
         src = Path(frame["path"])
         stem = f"{frame_set_by_frame[frame_id]}__{src.stem}"
@@ -85,6 +100,7 @@ def export_dataset(project_id: str, name: str, frame_set_ids: list[str], history
                 "label_codes": label_codes,
                 "frame_set_ids": frame_set_ids,
                 "history_dataset_ids": history_dataset_ids or [],
+                "annotated_only": annotated_only,
                 "summary": counts,
             },
             ensure_ascii=False,

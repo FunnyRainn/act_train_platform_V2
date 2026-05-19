@@ -14,7 +14,10 @@
     <label>版本名称<input name="name" value="训练数据集 v1"></label>
     <label>帧集<select name="frame_set_ids" multiple size="10"></select></label>
     <label>混入历史数据集<select name="history_dataset_ids" multiple size="6"></select></label>
-    <button class="primary" type="submit">导出训练数据集</button>
+    <div class="button-row">
+      <button class="primary" type="submit">导出训练数据集</button>
+      <button type="button" id="export-annotated-only">只导出已标注帧</button>
+    </div>
   </form>
   <section class="panel">
     <h2>训练数据集列表</h2>

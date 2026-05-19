@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.3`
+`v1.0.0.4`
 
 ## Repository
 
@@ -107,3 +107,12 @@ Customer-facing wording and navigation cleanup:
 - Renames the customer-visible `SOP 名称` field to `流程说明`; the underlying database field remains `sop_name` for compatibility.
 - Clarifies that training product flow text is only traceability metadata and does not participate in SOP judgement.
 - Keeps help buttons inline with field labels, including the target-label help button.
+
+## v1.0.0.4
+
+Dataset export and pre-labeling convenience update:
+
+- Adds an explicit annotated-frame-only dataset export entry on the training dataset page.
+- Records dataset export mode in the dataset summary for traceability.
+- Adds a configurable pre-label confidence threshold in the annotation workspace.
+- Validates pre-label confidence on both the page and backend.

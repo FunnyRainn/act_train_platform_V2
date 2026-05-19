@@ -349,7 +349,11 @@ $("#prelabel-btn").addEventListener("click", async () => {
   try {
     const modelPath = $("#prelabel-model").value.trim();
     if (!modelPath) throw new Error("请填写旧模型路径");
-    const result = await apiPost("/api/prelabel", { frame_set_id: state.frameSetId, model_path: modelPath, conf: 0.25 });
+    const conf = Number($("#prelabel-conf").value || 0.25);
+    if (!Number.isFinite(conf) || conf < 0.05 || conf > 0.95) {
+      throw new Error("预标注置信度需要在 0.05 到 0.95 之间");
+    }
+    const result = await apiPost("/api/prelabel", { frame_set_id: state.frameSetId, model_path: modelPath, conf });
     showToast(`预标注完成，生成 ${result.created} 个待确认框`);
     await loadBoxes();
     draw();
