@@ -377,7 +377,7 @@ document.addEventListener("keydown", event => {
     event.preventDefault();
     $("#next-frame").click();
   }
-});
+}, true);
 
 window.addEventListener("resize", () => {
   if (image.complete && image.style.display !== "none") {

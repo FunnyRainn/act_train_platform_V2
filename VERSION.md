@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.6`
+`v1.0.0.7`
 
 ## Repository
 
@@ -131,3 +131,9 @@ Annotation shortcut reliability fix:
 - Allows `A` / `D` frame shortcuts to work when focus remains on the frame-set or label select.
 - Keeps shortcuts disabled while typing in text inputs, textareas, or editable fields.
 - Uses physical key codes as the primary shortcut signal with key-value fallback.
+
+## v1.0.0.7
+
+Annotation shortcut event-order fix:
+
+- Handles `A` / `D` shortcuts during the keyboard capture phase so focused select controls cannot consume the key before frame navigation runs.
