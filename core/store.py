@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
 from .db import get_conn, json_dumps, json_loads, row_to_dict, rows_to_dicts
+from .paths import FRAMES_DIR
 from .utils import new_id, now_text, safe_name
+
+
+def _path_exists(value: str | Path | None) -> bool:
+    return bool(value) and Path(value).exists()
+
+
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def list_labels(enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -104,12 +118,14 @@ def list_videos(project_id: str | None = None) -> list[dict[str, Any]]:
         params.append(project_id)
     sql += " ORDER BY created_at DESC"
     with get_conn() as conn:
-        return rows_to_dicts(conn.execute(sql, params).fetchall())
+        rows = rows_to_dicts(conn.execute(sql, params).fetchall())
+    return [row for row in rows if _path_exists(row.get("path"))]
 
 
 def list_video_assets() -> list[dict[str, Any]]:
     with get_conn() as conn:
-        return rows_to_dicts(conn.execute("SELECT * FROM video_assets ORDER BY created_at DESC").fetchall())
+        rows = rows_to_dicts(conn.execute("SELECT * FROM video_assets ORDER BY created_at DESC").fetchall())
+    return [row for row in rows if _path_exists(row.get("stored_path"))]
 
 
 def get_video_asset(asset_id: str) -> dict[str, Any]:
@@ -186,9 +202,35 @@ def list_frame_sets(project_id: str | None = None) -> list[dict[str, Any]]:
     sql += " ORDER BY created_at DESC"
     with get_conn() as conn:
         rows = rows_to_dicts(conn.execute(sql, params).fetchall())
+        frame_rows = {
+            row["id"]: rows_to_dicts(
+                conn.execute("SELECT path FROM frames WHERE frame_set_id=? LIMIT 20", (row["id"],)).fetchall()
+            )
+            for row in rows
+        }
     for row in rows:
         row["config"] = json_loads(row.pop("config_json"), {})
-    return rows
+    valid_rows = []
+    for row in rows:
+        output_dir = Path(row["output_dir"])
+        has_existing_frame = any(_path_exists(frame.get("path")) for frame in frame_rows.get(row["id"], []))
+        if output_dir.exists() and has_existing_frame:
+            valid_rows.append(row)
+    return valid_rows
+
+
+def find_frame_set_by_name(project_id: str, name: str) -> dict[str, Any] | None:
+    with get_conn() as conn:
+        row = row_to_dict(
+            conn.execute(
+                "SELECT * FROM frame_sets WHERE project_id=? AND name=? ORDER BY created_at DESC LIMIT 1",
+                (project_id, name),
+            ).fetchone()
+        )
+    if not row:
+        return None
+    row["config"] = json_loads(row.pop("config_json"), {})
+    return row
 
 
 def get_frame_set(frame_set_id: str) -> dict[str, Any]:
@@ -254,6 +296,18 @@ def insert_frames(frame_set_id: str, video_id: str, frame_paths: list[Path]) -> 
                     int(frame_set["config"].get("height") or 0),
                 ),
             )
+
+
+def delete_frame_set(frame_set_id: str) -> dict[str, Any]:
+    frame_set = get_frame_set(frame_set_id)
+    output_dir = Path(frame_set["output_dir"])
+    if output_dir.exists():
+        if not _is_under(output_dir, FRAMES_DIR):
+            raise ValueError(f"帧集目录不在平台抽帧目录内，拒绝删除: {output_dir}")
+        shutil.rmtree(output_dir)
+    with get_conn() as conn:
+        conn.execute("DELETE FROM frame_sets WHERE id=?", (frame_set_id,))
+    return {"id": frame_set_id, "deleted": True}
 
 
 def list_frames(frame_set_id: str) -> list[dict[str, Any]]:
@@ -352,6 +406,16 @@ def delete_track_interpolated(frame_set_id: str, track_id: str) -> None:
 def delete_frame_prelabels(frame_id: str) -> None:
     with get_conn() as conn:
         conn.execute("DELETE FROM annotations WHERE frame_id=? AND source='prelabel' AND confirmed=0", (frame_id,))
+
+
+def delete_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
+    get_frame_set(frame_set_id)
+    with get_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM annotations WHERE frame_set_id=? AND source='prelabel' AND confirmed=0",
+            (frame_set_id,),
+        )
+        return {"frame_set_id": frame_set_id, "deleted": cur.rowcount}
 
 
 def create_or_get_track(project_id: str, frame_set_id: str, label_code: str, track_id: str | None = None) -> dict[str, Any]:

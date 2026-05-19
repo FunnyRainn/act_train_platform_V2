@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ from core.db import init_db
 from core.paths import PROJECT_ROOT
 
 
-app = FastAPI(title="act_train_platform", version="1.0.0.3")
+app = FastAPI(title="act_train_platform", version="1.0.0.8")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
 
@@ -26,7 +27,7 @@ def on_startup() -> None:
 
 
 def page(request: Request, template: str, **context: Any) -> HTMLResponse:
-    context.setdefault("version", "v1.0.0.3")
+    context.setdefault("version", "v1.0.0.8")
     return templates.TemplateResponse(request, template, context)
 
 
@@ -159,7 +160,17 @@ async def extract_frames(request: Request) -> dict:
             int(payload.get("sample_every_n_frames") or 5),
             int(payload.get("max_frames") or 0),
             int(payload.get("jpeg_quality") or 95),
+            payload.get("name"),
+            bool(payload.get("overwrite", False)),
         )
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@app.delete("/api/frame-sets/{frame_set_id}")
+def delete_frame_set(frame_set_id: str) -> dict:
+    try:
+        return store.delete_frame_set(frame_set_id)
     except Exception as exc:
         raise api_error(exc)
 
@@ -246,6 +257,15 @@ async def prelabel(request: Request) -> dict:
         raise api_error(exc)
 
 
+@app.post("/api/prelabel/clear")
+async def clear_prelabel(request: Request) -> dict:
+    try:
+        payload = await request.json()
+        return prelabel_ops.clear_unconfirmed_prelabels(payload["frame_set_id"])
+    except Exception as exc:
+        raise api_error(exc)
+
+
 @app.get("/api/datasets")
 def list_datasets(project_id: str | None = None) -> list[dict]:
     return store.list_dataset_versions(project_id)
@@ -317,6 +337,19 @@ async def create_model_package(request: Request) -> dict:
     try:
         payload = await request.json()
         return training_ops.export_model_package(payload["train_job_id"], payload.get("name") or "模型包")
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@app.post("/api/model-packages/{package_id}/open-folder")
+def open_model_package_folder(package_id: str) -> dict:
+    try:
+        package = store.get_model_package(package_id)
+        package_dir = Path(package["package_dir"])
+        if not package_dir.exists():
+            raise FileNotFoundError("模型目录不存在，可能已被移动或删除")
+        subprocess.Popen(["explorer.exe", str(package_dir)])
+        return {"package_id": package_id, "opened": True, "package_dir": str(package_dir)}
     except Exception as exc:
         raise api_error(exc)
 

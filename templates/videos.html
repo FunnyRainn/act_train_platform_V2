@@ -25,6 +25,7 @@
 <section class="panel form">
   <h2>抽帧</h2>
   <div class="form-row">
+    <label>帧集名称<input id="frame-set-name" placeholder="例如：工位2-湿度卡-15抽帧"></label>
     <label>当前产品视频<select id="extract-video"></select></label>
     <label>每 N 帧取一帧<input id="sample-n" type="number" value="5" min="1"></label>
     <label>最大帧数<input id="max-frames" type="number" value="300" min="0"></label>
@@ -42,5 +43,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/videos.js"></script>
+<script src="/static/js/videos.js?v=1.0.0.8"></script>
 {% endblock %}

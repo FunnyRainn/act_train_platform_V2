@@ -31,6 +31,8 @@
       <input id="prelabel-conf" type="number" min="0.05" max="0.95" step="0.05" value="0.25">
     </label>
     <button id="prelabel-btn">运行预标注</button>
+    <button id="clear-prelabels-btn" type="button">清空全部预标注框</button>
+    <div id="prelabel-status" class="row-meta">预标注空闲</div>
     <div id="box-list" class="box-list"></div>
   </aside>
   <section class="panel annotator-main">
@@ -47,5 +49,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/annotate.js"></script>
+<script src="/static/js/annotate.js?v=1.0.0.8"></script>
 {% endblock %}

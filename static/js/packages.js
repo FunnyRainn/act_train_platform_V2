@@ -17,9 +17,21 @@ async function refreshPackages() {
       </div>
       <div>
         ${focus ? '<span class="badge-soft">当前查看</span>' : ''}
+        <button data-open-package="${esc(pkg.id)}">打开文件夹</button>
       </div>
     </div>`;
   }).join("") : `<div class="empty-state">暂无模型。训练完成或停止后，若已有可用模型文件，系统会自动整理到这里。</div>`;
+
+  $$("[data-open-package]").forEach(button => {
+    button.onclick = async () => {
+      try {
+        await apiPost(`/api/model-packages/${encodeURIComponent(button.dataset.openPackage)}/open-folder`, {});
+        showToast("已请求打开模型目录");
+      } catch (error) {
+        showToast(error.message, "error");
+      }
+    };
+  });
 }
 
 refreshPackages();

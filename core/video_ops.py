@@ -91,20 +91,36 @@ def register_imported_video(project_id: str, source_path: str, copy_to_platform:
     return _create_product_video_from_asset(project_id, asset)
 
 
-def extract_frames(video_id: str, sample_every_n_frames: int, max_frames: int = 0, jpeg_quality: int = 95) -> dict:
+def extract_frames(
+    video_id: str,
+    sample_every_n_frames: int,
+    max_frames: int = 0,
+    jpeg_quality: int = 95,
+    name: str | None = None,
+    overwrite: bool = False,
+) -> dict:
     video = store.get_video(video_id)
     if sample_every_n_frames <= 0:
         raise ValueError("抽帧间隔必须大于 0")
+    frame_set_name = (name or f"{video['name']} 抽帧 {sample_every_n_frames}").strip()
+    if not frame_set_name:
+        raise ValueError("帧集名称不能为空")
+    existing = store.find_frame_set_by_name(video["project_id"], frame_set_name)
+    if existing:
+        if not overwrite:
+            raise ValueError(f"帧集名称已存在: {frame_set_name}")
+        store.delete_frame_set(existing["id"])
+
     video_path = Path(video["path"])
     frame_set_id = new_id("frameset")
     output_dir = FRAMES_DIR / video["project_id"] / frame_set_id
     output_dir.mkdir(parents=True, exist_ok=True)
-    frame_set = store.create_frame_set(
+    store.create_frame_set(
         {
             "id": frame_set_id,
             "project_id": video["project_id"],
             "video_id": video_id,
-            "name": f"{video['name']} 抽帧 {sample_every_n_frames}",
+            "name": frame_set_name,
             "output_dir": output_dir,
             "sample_every_n_frames": sample_every_n_frames,
             "max_frames": max_frames,

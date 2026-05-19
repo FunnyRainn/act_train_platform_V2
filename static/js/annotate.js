@@ -18,6 +18,7 @@ async function initAnnotator() {
   state.bootstrap = await loadBootstrap();
   fillSelect($("#frame-set-select"), state.bootstrap.frame_sets, item => item.id, item => `${item.name} (${item.frame_count}帧)`, "选择帧集");
   fillSelect($("#label-select"), state.bootstrap.labels.filter(x => x.enabled), item => item.code, item => `${item.code} ${item.name}`, "选择标签");
+  updatePrelabelStatus("预标注空闲");
 }
 
 async function loadFrameSet(frameSetId) {
@@ -25,6 +26,7 @@ async function loadFrameSet(frameSetId) {
   state.frameSetId = frameSetId;
   state.frames = await apiGet(`/api/frame-sets/${frameSetId}/frames`);
   state.frameIndex = 0;
+  updatePrelabelStatus("预标注空闲");
   await showFrame();
 }
 
@@ -65,17 +67,30 @@ async function loadBoxes() {
   renderBoxList();
 }
 
+function confidenceText(box) {
+  const value = Number(box.confidence);
+  return Number.isFinite(value) ? value.toFixed(2) : "";
+}
+
 function renderBoxList() {
-  $("#box-list").innerHTML = state.boxes.map((box, idx) => `
-    <div class="box-item ${idx === state.selectedIndex ? "selected" : ""}">
-      <strong>${esc(box.label_code)}</strong>
-      ${box.track_id ? `<span>跟踪对象 ${esc(box.track_id.slice(-6))}</span>` : ""}
-      <div>来源: ${sourceText(box.source)} | ${box.is_keyframe ? "关键帧" : "普通帧"} | ${box.confirmed ? "已确认" : "待确认"}</div>
-      <button data-select="${idx}">选中</button>
-      ${box.source === "prelabel" && !box.confirmed ? `<button data-confirm="${idx}">确认</button>` : ""}
-      <button data-delete="${idx}">删除</button>
-    </div>
-  `).join("");
+  $("#box-list").innerHTML = state.boxes.map((box, idx) => {
+    const confidence = confidenceText(box);
+    return `
+      <div class="box-item ${idx === state.selectedIndex ? "selected" : ""}">
+        <strong>${esc(box.label_code)}</strong>
+        ${box.track_id ? `<span>跟踪对象 ${esc(box.track_id.slice(-6))}</span>` : ""}
+        <div>
+          来源: ${sourceText(box.source)}
+          ${confidence ? ` | 置信度: ${confidence}` : ""}
+          | ${box.is_keyframe ? "关键帧" : "普通帧"}
+          | ${box.confirmed ? "已确认" : "待确认"}
+        </div>
+        <button data-select="${idx}">选中</button>
+        ${box.source === "prelabel" && !box.confirmed ? `<button data-confirm="${idx}">确认</button>` : ""}
+        <button data-delete="${idx}">删除</button>
+      </div>
+    `;
+  }).join("");
   $$("[data-select]").forEach(btn => btn.onclick = () => selectBox(Number(btn.dataset.select)));
   $$("[data-confirm]").forEach(btn => btn.onclick = () => {
     state.boxes[Number(btn.dataset.confirm)].confirmed = true;
@@ -158,14 +173,17 @@ function draw() {
   state.boxes.forEach((box, idx) => {
     const p = toPixelBox(box);
     const color = box.source === "prelabel" && !box.confirmed ? "#f5a623" : box.source === "interpolated" ? "#8fb4ff" : box.is_keyframe ? "#1fbf75" : "#2f76ff";
+    const confidence = confidenceText(box);
+    const label = `${box.label_code} ${sourceText(box.source)}${confidence ? ` ${confidence}` : ""}`;
     ctx.strokeStyle = idx === state.selectedIndex ? "#ffffff" : color;
     ctx.lineWidth = idx === state.selectedIndex ? 3 : 2;
     ctx.strokeRect(p.x, p.y, p.w, p.h);
-    ctx.fillStyle = color;
-    ctx.fillRect(p.x, Math.max(0, p.y - 22), 142, 22);
-    ctx.fillStyle = "#fff";
     ctx.font = "13px Microsoft YaHei";
-    ctx.fillText(`${box.label_code} ${sourceText(box.source)}`, p.x + 5, Math.max(14, p.y - 7));
+    const labelWidth = Math.max(100, Math.min(canvas.width - p.x, ctx.measureText(label).width + 12));
+    ctx.fillStyle = color;
+    ctx.fillRect(p.x, Math.max(0, p.y - 22), labelWidth, 22);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, p.x + 5, Math.max(14, p.y - 7));
     if (idx === state.selectedIndex) drawHandles(p);
   });
   if (state.drawing) {
@@ -233,6 +251,7 @@ canvas.addEventListener("mouseup", () => {
     source: "manual",
     is_keyframe: $("#is-keyframe").checked,
     confirmed: true,
+    confidence: null,
   });
   state.selectedIndex = state.boxes.length - 1;
   scheduleSave();
@@ -281,10 +300,35 @@ async function saveCurrentFrame() {
   }
 }
 
+async function goFrame(delta) {
+  if (!state.frames.length) return;
+  const nextIndex = state.frameIndex + delta;
+  if (nextIndex < 0 || nextIndex >= state.frames.length) return;
+  await saveCurrentFrame();
+  state.frameIndex = nextIndex;
+  await showFrame();
+}
+
+function clearCurrentFrameBoxes() {
+  if (!state.frameSetId || !currentFrame()) return;
+  state.boxes = [];
+  state.selectedIndex = -1;
+  scheduleSave();
+  renderBoxList();
+  draw();
+}
+
+function updatePrelabelStatus(message, type = "") {
+  const el = $("#prelabel-status");
+  if (!el) return;
+  el.textContent = message;
+  el.dataset.status = type;
+}
+
 $("#frame-set-select").addEventListener("change", event => loadFrameSet(event.target.value));
-$("#prev-frame").addEventListener("click", async () => { if (state.frameIndex > 0) { await saveCurrentFrame(); state.frameIndex--; await showFrame(); } });
-$("#next-frame").addEventListener("click", async () => { if (state.frameIndex < state.frames.length - 1) { await saveCurrentFrame(); state.frameIndex++; await showFrame(); } });
-$("#clear-boxes-btn").addEventListener("click", () => { state.boxes = []; state.selectedIndex = -1; scheduleSave(); renderBoxList(); draw(); });
+$("#prev-frame").addEventListener("click", () => goFrame(-1));
+$("#next-frame").addEventListener("click", () => goFrame(1));
+$("#clear-boxes-btn").addEventListener("click", clearCurrentFrameBoxes);
 
 $("#label-select").addEventListener("change", () => {
   if (state.selectedIndex >= 0) {
@@ -346,15 +390,41 @@ $("#interpolate-btn").addEventListener("click", async () => {
 });
 
 $("#prelabel-btn").addEventListener("click", async () => {
+  const button = $("#prelabel-btn");
   try {
     const modelPath = $("#prelabel-model").value.trim();
+    if (!state.frameSetId) throw new Error("请先选择帧集");
     if (!modelPath) throw new Error("请填写旧模型路径");
     const conf = Number($("#prelabel-conf").value || 0.25);
     if (!Number.isFinite(conf) || conf < 0.05 || conf > 0.95) {
       throw new Error("预标注置信度需要在 0.05 到 0.95 之间");
     }
+    const startText = new Date().toLocaleTimeString();
+    button.disabled = true;
+    button.textContent = "预标注运行中...";
+    updatePrelabelStatus(`预标注运行中，开始时间 ${startText}`, "running");
+    await new Promise(requestAnimationFrame);
     const result = await apiPost("/api/prelabel", { frame_set_id: state.frameSetId, model_path: modelPath, conf });
+    updatePrelabelStatus(`预标注完成，生成 ${result.created} 个待确认框`, "done");
     showToast(`预标注完成，生成 ${result.created} 个待确认框`);
+    await loadBoxes();
+    draw();
+  } catch (error) {
+    updatePrelabelStatus(`预标注失败：${error.message}`, "error");
+    showToast(error.message, "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = "运行预标注";
+  }
+});
+
+$("#clear-prelabels-btn")?.addEventListener("click", async () => {
+  try {
+    if (!state.frameSetId) throw new Error("请先选择帧集");
+    if (!confirm("将清空当前帧集全部未确认的预标注框，不会删除人工框和已确认框。确定继续吗？")) return;
+    const result = await apiPost("/api/prelabel/clear", { frame_set_id: state.frameSetId });
+    updatePrelabelStatus(`已清空 ${result.deleted} 个未确认预标注框`, "done");
+    showToast(`已清空 ${result.deleted} 个未确认预标注框`);
     await loadBoxes();
     draw();
   } catch (error) {
@@ -368,14 +438,20 @@ function isTypingTarget(target) {
 }
 
 document.addEventListener("keydown", event => {
-  if (isTypingTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (isTypingTarget(event.target) || event.altKey || event.metaKey) return;
   const key = event.key.toLowerCase();
+  if (event.ctrlKey && (event.code === "KeyO" || key === "o")) {
+    event.preventDefault();
+    clearCurrentFrameBoxes();
+    return;
+  }
+  if (event.ctrlKey) return;
   if (event.code === "KeyA" || key === "a") {
     event.preventDefault();
-    $("#prev-frame").click();
+    goFrame(-1);
   } else if (event.code === "KeyD" || key === "d") {
     event.preventDefault();
-    $("#next-frame").click();
+    goFrame(1);
   }
 }, true);
 

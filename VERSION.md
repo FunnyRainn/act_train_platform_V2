@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.7`
+`v1.0.0.8`
 
 ## Repository
 
@@ -137,3 +137,16 @@ Annotation shortcut reliability fix:
 Annotation shortcut event-order fix:
 
 - Handles `A` / `D` shortcuts during the keyboard capture phase so focused select controls cannot consume the key before frame navigation runs.
+
+## v1.0.0.8
+
+Pre-label feedback, frame-set management, and model-folder handoff update:
+
+- Shows visible pre-label running/completed/failed status in the annotation workspace.
+- Displays confidence values on pre-label boxes in both canvas labels and the box list.
+- Adds clearing for all unconfirmed pre-label boxes in the current frame set.
+- Adds `Ctrl+O` as a shortcut for clearing boxes on the current frame.
+- Allows custom frame-set names during frame extraction and supports explicit overwrite for duplicate names.
+- Adds frame-set deletion, including extracted frame images and related annotations/tracks.
+- Hides video assets, product videos, and frame sets whose backing files or directories are missing.
+- Adds a model repository action to open the deployable model directory in Windows Explorer.
