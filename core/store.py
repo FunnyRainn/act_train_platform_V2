@@ -337,6 +337,9 @@ def list_annotations(frame_set_id: str, frame_id: str | None = None) -> list[dic
 
 
 def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str, annotations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    frame = get_frame(frame_id)
+    if frame["frame_set_id"] != frame_set_id:
+        raise ValueError(f"帧 {frame_id} 不属于帧集 {frame_set_id}，拒绝覆盖标注")
     with get_conn() as conn:
         conn.execute("DELETE FROM annotations WHERE frame_id=?", (frame_id,))
         for item in annotations:

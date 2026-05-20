@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.9`
+`v1.0.0.10`
 
 ## Repository
 
@@ -160,3 +160,13 @@ Dataset export merge and validation fix:
 - Remaps historical label class ids by label code to avoid class-index mismatch.
 - Validates historical dataset directory structure and label compatibility before export.
 - Improves dataset list summaries with current-frame counts, historical-mix counts, skipped-frame counts, and split totals.
+
+## v1.0.0.10
+
+Annotation save race and pre-label count clarification:
+
+- Saves annotation snapshots against the exact frame that triggered the save, instead of reading the current frame at execution time.
+- Flushes pending annotation saves before frame switching, pre-labeling, interpolation, and bulk pre-label clearing.
+- Adds backend validation so a frame can only be overwritten through its own frame set.
+- Clarifies that pre-label counts are whole-frame-set totals while the canvas shows only the current frame.
+- Shows current-frame box counts in the frame information line.

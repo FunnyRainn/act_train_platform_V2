@@ -8,6 +8,7 @@ let state = {
   selectedIndex: -1,
   drag: null,
   saveTimer: null,
+  saving: Promise.resolve(),
 };
 
 const canvas = $("#bbox-canvas");
@@ -23,6 +24,7 @@ async function initAnnotator() {
 
 async function loadFrameSet(frameSetId) {
   if (!frameSetId) return;
+  await flushPendingSave();
   state.frameSetId = frameSetId;
   state.frames = await apiGet(`/api/frame-sets/${frameSetId}/frames`);
   state.frameIndex = 0;
@@ -34,7 +36,37 @@ function currentFrame() {
   return state.frames[state.frameIndex];
 }
 
+function currentFrameSet() {
+  return state.bootstrap.frame_sets.find(item => item.id === state.frameSetId);
+}
+
+function boxesSnapshot() {
+  return state.boxes.map(box => ({ ...box }));
+}
+
+function currentSavePayload() {
+  const frame = currentFrame();
+  const frameSet = currentFrameSet();
+  if (!state.frameSetId || !frame || !frameSet) return null;
+  return {
+    project_id: frameSet.project_id,
+    frame_set_id: state.frameSetId,
+    frame_id: frame.id,
+    annotations: boxesSnapshot(),
+  };
+}
+
+function updateFrameInfo() {
+  const frame = currentFrame();
+  if (!frame) {
+    $("#frame-info").textContent = "未选择帧";
+    return;
+  }
+  $("#frame-info").textContent = `${state.frameIndex + 1}/${state.frames.length} | 原始帧号 ${frame.frame_index} | 当前帧框数 ${state.boxes.length}`;
+}
+
 async function showFrame() {
+  await flushPendingSave();
   if (!state.frames.length) {
     $("#frame-info").textContent = "帧集为空";
     return;
@@ -47,7 +79,7 @@ async function showFrame() {
     draw();
   };
   image.src = `/api/frames/${frame.id}/image?ts=${Date.now()}`;
-  $("#frame-info").textContent = `${state.frameIndex + 1}/${state.frames.length} | 原始帧号 ${frame.frame_index}`;
+  updateFrameInfo();
 }
 
 function fitCanvas() {
@@ -61,10 +93,12 @@ function fitCanvas() {
 }
 
 async function loadBoxes() {
+  await flushPendingSave();
   const frame = currentFrame();
   state.boxes = await apiGet(`/api/frame-sets/${state.frameSetId}/annotations?frame_id=${frame.id}`);
   state.selectedIndex = -1;
   renderBoxList();
+  updateFrameInfo();
 }
 
 function confidenceText(box) {
@@ -105,6 +139,7 @@ function renderBoxList() {
     renderBoxList();
     draw();
   });
+  updateFrameInfo();
 }
 
 function sourceText(source) {
@@ -278,33 +313,51 @@ function dragSelected(p) {
 }
 
 function scheduleSave() {
+  const payload = currentSavePayload();
+  if (!payload) return;
   $("#save-status").textContent = "保存中...";
   clearTimeout(state.saveTimer);
-  state.saveTimer = setTimeout(() => saveCurrentFrame(), 450);
+  state.saveTimer = setTimeout(() => saveFramePayload(payload), 450);
+}
+
+async function flushPendingSave() {
+  if (!state.saveTimer) {
+    await state.saving;
+    return;
+  }
+  clearTimeout(state.saveTimer);
+  state.saveTimer = null;
+  const payload = currentSavePayload();
+  if (payload) await saveFramePayload(payload);
+  await state.saving;
+}
+
+async function saveFramePayload(payload) {
+  clearTimeout(state.saveTimer);
+  state.saveTimer = null;
+  state.saving = state.saving.then(async () => {
+    try {
+      await apiPost("/api/annotations/frame", payload);
+      $("#save-status").textContent = "已保存";
+    } catch (error) {
+      $("#save-status").textContent = "保存失败";
+      showToast(error.message, "error");
+    }
+  });
+  return state.saving;
 }
 
 async function saveCurrentFrame() {
-  if (!state.frameSetId || !currentFrame()) return;
-  try {
-    const frameSet = state.bootstrap.frame_sets.find(item => item.id === state.frameSetId);
-    await apiPost("/api/annotations/frame", {
-      project_id: frameSet.project_id,
-      frame_set_id: state.frameSetId,
-      frame_id: currentFrame().id,
-      annotations: state.boxes,
-    });
-    $("#save-status").textContent = "已保存";
-  } catch (error) {
-    $("#save-status").textContent = "保存失败";
-    showToast(error.message, "error");
-  }
+  const payload = currentSavePayload();
+  if (!payload) return;
+  await saveFramePayload(payload);
 }
 
 async function goFrame(delta) {
   if (!state.frames.length) return;
   const nextIndex = state.frameIndex + delta;
   if (nextIndex < 0 || nextIndex >= state.frames.length) return;
-  await saveCurrentFrame();
+  await flushPendingSave();
   state.frameIndex = nextIndex;
   await showFrame();
 }
@@ -351,7 +404,8 @@ $("#is-keyframe").addEventListener("change", () => {
 
 $("#new-track-btn").addEventListener("click", async () => {
   try {
-    const frameSet = state.bootstrap.frame_sets.find(item => item.id === state.frameSetId);
+    const frameSet = currentFrameSet();
+    if (!frameSet) throw new Error("请先选择帧集");
     const track = await apiPost("/api/tracks", {
       project_id: frameSet.project_id,
       frame_set_id: state.frameSetId,
@@ -377,7 +431,7 @@ $("#save-frame-btn").addEventListener("click", saveCurrentFrame);
 
 $("#interpolate-btn").addEventListener("click", async () => {
   try {
-    await saveCurrentFrame();
+    await flushPendingSave();
     const trackId = $("#track-id").value;
     if (!trackId) throw new Error("请先新建或填写跟踪对象");
     const result = await apiPost(`/api/tracks/${trackId}/interpolate`, { frame_set_id: state.frameSetId });
@@ -392,6 +446,7 @@ $("#interpolate-btn").addEventListener("click", async () => {
 $("#prelabel-btn").addEventListener("click", async () => {
   const button = $("#prelabel-btn");
   try {
+    await flushPendingSave();
     const modelPath = $("#prelabel-model").value.trim();
     if (!state.frameSetId) throw new Error("请先选择帧集");
     if (!modelPath) throw new Error("请填写旧模型路径");
@@ -405,8 +460,8 @@ $("#prelabel-btn").addEventListener("click", async () => {
     updatePrelabelStatus(`预标注运行中，开始时间 ${startText}`, "running");
     await new Promise(requestAnimationFrame);
     const result = await apiPost("/api/prelabel", { frame_set_id: state.frameSetId, model_path: modelPath, conf });
-    updatePrelabelStatus(`预标注完成，生成 ${result.created} 个待确认框`, "done");
-    showToast(`预标注完成，生成 ${result.created} 个待确认框`);
+    updatePrelabelStatus(`整个帧集共生成 ${result.created} 个待确认框；当前画面只显示当前帧的框`, "done");
+    showToast(`整个帧集共生成 ${result.created} 个待确认框`);
     await loadBoxes();
     draw();
   } catch (error) {
@@ -420,6 +475,7 @@ $("#prelabel-btn").addEventListener("click", async () => {
 
 $("#clear-prelabels-btn")?.addEventListener("click", async () => {
   try {
+    await flushPendingSave();
     if (!state.frameSetId) throw new Error("请先选择帧集");
     if (!confirm("将清空当前帧集全部未确认的预标注框，不会删除人工框和已确认框。确定继续吗？")) return;
     const result = await apiPost("/api/prelabel/clear", { frame_set_id: state.frameSetId });
