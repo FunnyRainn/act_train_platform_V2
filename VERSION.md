@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.8`
+`v1.0.0.9`
 
 ## Repository
 
@@ -150,3 +150,13 @@ Pre-label feedback, frame-set management, and model-folder handoff update:
 - Adds frame-set deletion, including extracted frame images and related annotations/tracks.
 - Hides video assets, product videos, and frame sets whose backing files or directories are missing.
 - Adds a model repository action to open the deployable model directory in Windows Explorer.
+
+## v1.0.0.9
+
+Dataset export merge and validation fix:
+
+- Prevents dataset export when neither frame sets nor historical datasets are selected.
+- Actually merges selected historical dataset image/label files into newly exported datasets.
+- Remaps historical label class ids by label code to avoid class-index mismatch.
+- Validates historical dataset directory structure and label compatibility before export.
+- Improves dataset list summaries with current-frame counts, historical-mix counts, skipped-frame counts, and split totals.
