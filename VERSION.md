@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.10`
+`v1.0.0.11`
 
 ## Repository
 
@@ -170,3 +170,13 @@ Annotation save race and pre-label count clarification:
 - Adds backend validation so a frame can only be overwritten through its own frame set.
 - Clarifies that pre-label counts are whole-frame-set totals while the canvas shows only the current frame.
 - Shows current-frame box counts in the frame information line.
+
+## v1.0.0.11
+
+Pre-label confirmation and export clarity:
+
+- Rewrites the annotation workspace script with clean Chinese text after legacy mojibake broke several JS strings.
+- Keeps autosave bound to the frame snapshot that triggered the save, preventing quick frame switching from overwriting the wrong frame.
+- Shows pre-label totals as whole-frame-set counts and current-frame counts separately.
+- Adds explicit single-box confirmation and current-frame-set bulk pre-label confirmation.
+- Makes dataset export summaries show manual boxes, confirmed pre-label boxes, and skipped unconfirmed pre-label boxes.

@@ -51,9 +51,14 @@ def run_prelabel(frame_set_id: str, model_path: str, conf: float = 0.25) -> dict
             for annotation in annotations:
                 store.add_annotation(project["id"], frame_set_id, frame["id"], annotation)
             created += len(annotations)
-    return {"frame_set_id": frame_set_id, "created": created}
+    counts = store.count_frame_set_prelabels(frame_set_id)
+    return {"frame_set_id": frame_set_id, "created": created, **counts}
 
 
 def clear_unconfirmed_prelabels(frame_set_id: str) -> dict:
     """Clear unconfirmed pre-label boxes in a frame set without touching manual annotations."""
     return store.delete_frame_set_prelabels(frame_set_id)
+
+
+def confirm_all_prelabels(frame_set_id: str) -> dict:
+    return store.confirm_frame_set_prelabels(frame_set_id)

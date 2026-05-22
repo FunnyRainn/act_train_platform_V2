@@ -266,6 +266,15 @@ async def clear_prelabel(request: Request) -> dict:
         raise api_error(exc)
 
 
+@app.post("/api/prelabel/confirm-all")
+async def confirm_all_prelabel(request: Request) -> dict:
+    try:
+        payload = await request.json()
+        return prelabel_ops.confirm_all_prelabels(payload["frame_set_id"])
+    except Exception as exc:
+        raise api_error(exc)
+
+
 @app.get("/api/datasets")
 def list_datasets(project_id: str | None = None) -> list[dict]:
     return store.list_dataset_versions(project_id)

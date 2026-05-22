@@ -421,6 +421,26 @@ def delete_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
         return {"frame_set_id": frame_set_id, "deleted": cur.rowcount}
 
 
+def confirm_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
+    get_frame_set(frame_set_id)
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE annotations SET confirmed=1, updated_at=CURRENT_TIMESTAMP WHERE frame_set_id=? AND source='prelabel' AND confirmed=0",
+            (frame_set_id,),
+        )
+        return {"frame_set_id": frame_set_id, "confirmed": cur.rowcount}
+
+
+def count_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
+    get_frame_set(frame_set_id)
+    with get_conn() as conn:
+        total = conn.execute("SELECT COUNT(*) FROM annotations WHERE frame_set_id=? AND source='prelabel'", (frame_set_id,)).fetchone()[0]
+        pending = conn.execute("SELECT COUNT(*) FROM annotations WHERE frame_set_id=? AND source='prelabel' AND confirmed=0", (frame_set_id,)).fetchone()[0]
+        confirmed = conn.execute("SELECT COUNT(*) FROM annotations WHERE frame_set_id=? AND source='prelabel' AND confirmed=1", (frame_set_id,)).fetchone()[0]
+        frames = conn.execute("SELECT COUNT(DISTINCT frame_id) FROM annotations WHERE frame_set_id=? AND source='prelabel'", (frame_set_id,)).fetchone()[0]
+    return {"total": total, "pending": pending, "confirmed": confirmed, "frames": frames}
+
+
 def create_or_get_track(project_id: str, frame_set_id: str, label_code: str, track_id: str | None = None) -> dict[str, Any]:
     with get_conn() as conn:
         if track_id:

@@ -149,6 +149,8 @@ def export_dataset(
         "history_boxes": 0,
         "history_sources": [],
         "skipped_unconfirmed": 0,
+        "confirmed_prelabel_boxes": 0,
+        "skipped_unconfirmed_prelabel_boxes": 0,
         "skipped_unannotated": 0,
         "skipped_history_missing_label": 0,
         "skipped_history_empty_label": 0,
@@ -156,11 +158,10 @@ def export_dataset(
     }
     for frame_id, split in split_map.items():
         frame = frame_lookup[frame_id]
-        anns = [
-            ann
-            for ann in store.list_annotations(frame_set_by_frame[frame_id], frame_id)
-            if ann["confirmed"] and ann["label_code"] in class_map
-        ]
+        raw_anns = [ann for ann in store.list_annotations(frame_set_by_frame[frame_id], frame_id) if ann["label_code"] in class_map]
+        counts["skipped_unconfirmed_prelabel_boxes"] += sum(1 for ann in raw_anns if ann.get("source") == "prelabel" and not ann["confirmed"])
+        anns = [ann for ann in raw_anns if ann["confirmed"]]
+        counts["confirmed_prelabel_boxes"] += sum(1 for ann in anns if ann.get("source") == "prelabel")
         if not anns:
             counts["skipped_unannotated"] += 1
             continue

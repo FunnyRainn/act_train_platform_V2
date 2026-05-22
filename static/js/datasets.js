@@ -1,4 +1,4 @@
-function datasetSummaryText(summary) {
+﻿function datasetSummaryText(summary) {
   const modeText = summary.export_mode === "annotated_only" ? "只导出已标注帧" : "已确认标注";
   const historyText = Number(summary.history_images || 0) > 0
     ? `历史混入: ${summary.history_images}张/${summary.history_boxes || 0}框`
@@ -7,7 +7,9 @@ function datasetSummaryText(summary) {
     `模式: ${modeText}`,
     `当前帧: ${summary.current_frames || 0}张/${summary.current_boxes || 0}框`,
     historyText,
-    `跳过未标注: ${summary.skipped_unannotated || 0}`,
+    `已确认预标注: ${summary.confirmed_prelabel_boxes || 0}框`,
+    `跳过未确认预标注: ${summary.skipped_unconfirmed_prelabel_boxes || 0}框`,
+    `跳过未标注帧: ${summary.skipped_unannotated || 0}`,
     `总计: train ${summary.train || 0} / val ${summary.val || 0} / test ${summary.test || 0}`,
   ].join(" | ");
 }
@@ -64,3 +66,4 @@ $("#export-annotated-only").addEventListener("click", async () => {
 });
 
 refreshDatasets();
+
