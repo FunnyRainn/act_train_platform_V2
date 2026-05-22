@@ -10,6 +10,7 @@
   saveTimer: null,
   pendingSavePayload: null,
   saving: Promise.resolve(),
+  imageLoadToken: 0,
 };
 
 const canvas = $("#bbox-canvas");
@@ -75,10 +76,12 @@ async function showFrame() {
     return;
   }
   const frame = currentFrame();
+  const token = ++state.imageLoadToken;
   image.onload = async () => {
+    if (token !== state.imageLoadToken || frame.id !== currentFrame()?.id) return;
     image.style.display = "block";
     fitCanvas();
-    await loadBoxes();
+    await loadBoxes(frame.id, token);
     draw();
   };
   image.src = `/api/frames/${frame.id}/image?ts=${Date.now()}`;
@@ -95,11 +98,14 @@ function fitCanvas() {
   canvas.style.height = `${rect.height}px`;
 }
 
-async function loadBoxes() {
+async function loadBoxes(frameId = null, token = state.imageLoadToken) {
   await flushPendingSave();
   const frame = currentFrame();
   if (!frame) return;
-  state.boxes = await apiGet(`/api/frame-sets/${state.frameSetId}/annotations?frame_id=${frame.id}`);
+  const expectedFrameId = frameId || frame.id;
+  const boxes = await apiGet(`/api/frame-sets/${state.frameSetId}/annotations?frame_id=${expectedFrameId}`);
+  if (token !== state.imageLoadToken || expectedFrameId !== currentFrame()?.id) return;
+  state.boxes = boxes;
   state.selectedIndex = -1;
   renderBoxList();
   updateFrameInfo();
@@ -465,9 +471,10 @@ $("#prelabel-btn").addEventListener("click", async () => {
     updatePrelabelStatus(`预标注运行中，开始时间 ${startText}`, "running");
     await new Promise(requestAnimationFrame);
     const result = await apiPost("/api/prelabel", { frame_set_id: state.frameSetId, model_path: modelPath, conf });
-    updatePrelabelStatus(`本次新增 ${result.created} 个；当前帧集共 ${result.total ?? result.created} 个预标注框，分布在 ${result.frames ?? "-"} 帧，待确认 ${result.pending ?? "-"} 个`, "done");
-    showToast(`当前帧集共 ${result.total ?? result.created} 个预标注框`);
     await loadBoxes();
+    const currentPrelabels = state.boxes.filter(box => box.source === "prelabel").length;
+    updatePrelabelStatus(`本次新增 ${result.created} 个；当前帧集共 ${result.total ?? result.created} 个预标注框，分布在 ${result.frames ?? "-"} 帧；当前帧 ${currentPrelabels} 个，待确认 ${result.pending ?? "-"} 个`, "done");
+    showToast(`当前帧集共 ${result.total ?? result.created} 个预标注框`);
     draw();
   } catch (error) {
     updatePrelabelStatus(`预标注失败：${error.message}`, "error");

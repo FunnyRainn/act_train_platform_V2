@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.11`
+`v1.0.0.12`
 
 ## Repository
 
@@ -180,3 +180,11 @@ Pre-label confirmation and export clarity:
 - Shows pre-label totals as whole-frame-set counts and current-frame counts separately.
 - Adds explicit single-box confirmation and current-frame-set bulk pre-label confirmation.
 - Makes dataset export summaries show manual boxes, confirmed pre-label boxes, and skipped unconfirmed pre-label boxes.
+
+## v1.0.0.12
+
+Annotation frame-load and pre-label count follow-up:
+
+- Adds a frame image load token so stale image-load callbacks cannot overwrite the currently selected frame's annotation boxes.
+- Keeps pre-label completion text based on database totals while also showing the current frame's pre-label count after reload.
+- Preserves the confirmed-only dataset export rule for pre-label boxes.
