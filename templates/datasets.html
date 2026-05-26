@@ -13,7 +13,19 @@
     <label>产品<select name="project_id"></select></label>
     <label>版本名称<input name="name" value="训练数据集 v1"></label>
     <label>帧集<select name="frame_set_ids" multiple size="10"></select></label>
+    <label>导出视野
+      <select name="image_scope" id="dataset-image-scope">
+        <option value="full_image">整图训练数据集</option>
+        <option value="focus_region_crop">关注区域裁剪训练数据集</option>
+      </select>
+    </label>
     <label>混入历史数据集<select name="history_dataset_ids" multiple size="6"></select></label>
+    <label class="inline"><input type="checkbox" name="force_mixed_scope"> 视野不一致时仍强制混入</label>
+    <div id="focus-export-panel" class="focus-export-panel hidden">
+      <h3>关注区域导出与历史混入</h3>
+      <div class="row-meta">勾选多个关注区域时，每个区域会生成一个独立训练数据集。每个区域可单独选择要混入的历史数据集。</div>
+      <div id="focus-export-list"></div>
+    </div>
     <div class="button-row">
       <button class="primary" type="submit">导出训练数据集</button>
       <button type="button" id="export-annotated-only" title="导出选中帧集中的已标注帧，并混入已选历史数据集">只导出已标注帧</button>
@@ -26,5 +38,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/datasets.js?v=1.0.0.9"></script>
+<script src="/static/js/datasets.js?v=1.1.0.0"></script>
 {% endblock %}

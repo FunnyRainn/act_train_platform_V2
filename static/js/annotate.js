@@ -11,6 +11,11 @@
   pendingSavePayload: null,
   saving: Promise.resolve(),
   imageLoadToken: 0,
+  focusRegions: [],
+  focusMode: "box",
+  editingFocusId: "",
+  focusDraft: null,
+  focusDraftIsNorm: false,
 };
 
 const canvas = $("#bbox-canvas");
@@ -40,6 +45,15 @@ function currentFrame() {
 
 function currentFrameSet() {
   return state.bootstrap.frame_sets.find(item => item.id === state.frameSetId);
+}
+
+function currentProjectId() {
+  return currentFrameSet()?.project_id || "";
+}
+
+function focusRegionsForCurrentProject() {
+  const projectId = currentProjectId();
+  return (state.focusRegions || []).filter(region => region.project_id === projectId && Number(region.enabled) !== 0);
 }
 
 function boxesSnapshot() {
@@ -81,11 +95,18 @@ async function showFrame() {
     if (token !== state.imageLoadToken || frame.id !== currentFrame()?.id) return;
     image.style.display = "block";
     fitCanvas();
+    await loadFocusRegions();
     await loadBoxes(frame.id, token);
     draw();
   };
   image.src = `/api/frames/${frame.id}/image?ts=${Date.now()}`;
   updateFrameInfo();
+}
+
+async function loadFocusRegions() {
+  const projectId = currentProjectId();
+  state.focusRegions = projectId ? await apiGet(`/api/focus-regions?project_id=${encodeURIComponent(projectId)}`) : [];
+  renderFocusRegions();
 }
 
 function fitCanvas() {
@@ -186,6 +207,21 @@ function toNormBox(rect) {
   });
 }
 
+function rectInsideFocus(box) {
+  const regions = focusRegionsForCurrentProject();
+  if (!regions.length) return true;
+  return regions.some(region => (
+    box.x >= Number(region.x) - 1e-6 &&
+    box.y >= Number(region.y) - 1e-6 &&
+    box.x + box.w <= Number(region.x) + Number(region.w) + 1e-6 &&
+    box.y + box.h <= Number(region.y) + Number(region.h) + 1e-6
+  ));
+}
+
+function rectOutsideFocus(box) {
+  return !rectInsideFocus(box);
+}
+
 function clampBox(box) {
   let x = Math.max(0, Math.min(1, Number(box.x) || 0));
   let y = Math.max(0, Math.min(1, Number(box.y) || 0));
@@ -223,6 +259,12 @@ function hitTest(point) {
 canvas.addEventListener("mousedown", event => {
   if (!state.frameSetId || !currentFrame()) return;
   const p = pointer(event);
+  if (state.focusMode === "focus") {
+    state.focusDraft = { x: p.x, y: p.y, w: 0, h: 0 };
+    state.focusDraftIsNorm = false;
+    state.drawing = null;
+    return;
+  }
   const hit = hitTest(p);
   if (hit) {
     selectBox(hit.index);
@@ -236,6 +278,12 @@ canvas.addEventListener("mousedown", event => {
 
 canvas.addEventListener("mousemove", event => {
   const p = pointer(event);
+  if (state.focusDraft) {
+    state.focusDraft.w = p.x - state.focusDraft.x;
+    state.focusDraft.h = p.y - state.focusDraft.y;
+    draw();
+    return;
+  }
   if (state.drag) {
     dragSelected(p);
     return;
@@ -247,7 +295,28 @@ canvas.addEventListener("mousemove", event => {
 });
 
 window.addEventListener("mouseup", () => {
+  if (state.focusDraft) {
+    const rect = normalizePixelRect(state.focusDraft);
+    state.focusDraft = null;
+    state.focusDraftIsNorm = true;
+    const box = toNormBox(rect);
+    if (box.w < 0.01 || box.h < 0.01) {
+      showToast("关注区域太小，已忽略", "error");
+      draw();
+      return;
+    }
+    state.focusDraft = box;
+    $("#focus-region-name").focus();
+    showToast("已框选关注区域，请填写名称并确认锁定", "info");
+    draw();
+    return;
+  }
   if (state.drag) {
+    if (rectOutsideFocus(state.boxes[state.drag.index])) {
+      state.boxes[state.drag.index] = state.drag.original;
+      showToast("标注框必须完整位于关注区域内", "error");
+      draw();
+    }
     state.drag = null;
     scheduleSave();
     return;
@@ -258,6 +327,11 @@ window.addEventListener("mouseup", () => {
   const box = toNormBox(rect);
   if (box.w < 0.005 || box.h < 0.005) {
     showToast("框太小，已忽略", "error");
+    draw();
+    return;
+  }
+  if (rectOutsideFocus(box)) {
+    showToast("请在关注区域内标注，区域外内容不会进入训练数据集", "error");
     draw();
     return;
   }
@@ -303,11 +377,13 @@ function dragSelected(p) {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawFocusRegions();
   state.boxes.forEach((box, idx) => {
     const p = toPixelBox(box);
-    const color = box.source === "prelabel" && !box.confirmed ? "#f5a623" : box.source === "interpolated" ? "#8fb4ff" : box.is_keyframe ? "#1fbf75" : "#2f76ff";
+    const invalid = rectOutsideFocus(box);
+    const color = invalid ? "#d94b4b" : box.source === "prelabel" && !box.confirmed ? "#f5a623" : box.source === "interpolated" ? "#8fb4ff" : box.is_keyframe ? "#1fbf75" : "#2f76ff";
     const confidence = confidenceText(box);
-    const label = `${box.label_code} ${sourceText(box.source)}${confidence ? ` ${confidence}` : ""}`;
+    const label = `${box.label_code} ${sourceText(box.source)}${confidence ? ` ${confidence}` : ""}${invalid ? " 区域外无效" : ""}`;
     ctx.strokeStyle = idx === state.selectedIndex ? "#ffffff" : color;
     ctx.lineWidth = idx === state.selectedIndex ? 3 : 2;
     ctx.strokeRect(p.x, p.y, p.w, p.h);
@@ -324,6 +400,76 @@ function draw() {
     ctx.lineWidth = 2;
     ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
   }
+  if (state.focusDraft) {
+    const rect = state.focusDraftIsNorm ? toPixelBox(state.focusDraft) : normalizePixelRect(state.focusDraft);
+    ctx.strokeStyle = "#00d4ff";
+    ctx.setLineDash([8, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.setLineDash([]);
+  }
+}
+
+function drawFocusRegions() {
+  const regions = focusRegionsForCurrentProject();
+  if (!regions.length) return;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,.42)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  regions.forEach(region => {
+    const rect = toPixelBox(region);
+    ctx.clearRect(rect.x, rect.y, rect.w, rect.h);
+  });
+  regions.forEach(region => {
+    const rect = toPixelBox(region);
+    ctx.strokeStyle = "#00d4ff";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    ctx.fillStyle = "rgba(0, 188, 212, .86)";
+    ctx.fillRect(rect.x, Math.max(0, rect.y - 22), Math.min(220, ctx.measureText(region.name).width + 16), 22);
+    ctx.fillStyle = "#fff";
+    ctx.font = "13px Microsoft YaHei";
+    ctx.fillText(region.name, rect.x + 6, Math.max(14, rect.y - 7));
+  });
+  ctx.restore();
+}
+
+function renderFocusRegions() {
+  const list = $("#focus-region-list");
+  if (!list) return;
+  const regions = focusRegionsForCurrentProject();
+  list.innerHTML = regions.length ? regions.map(region => `
+    <div class="focus-region-item">
+      <strong>${esc(region.name)}</strong>
+      <span>${Number(region.x).toFixed(3)}, ${Number(region.y).toFixed(3)}, ${Number(region.w).toFixed(3)}, ${Number(region.h).toFixed(3)}</span>
+      <button type="button" data-focus-edit="${esc(region.id)}">编辑</button>
+      <button type="button" data-focus-delete="${esc(region.id)}">删除</button>
+    </div>
+  `).join("") : `<div class="row-meta">尚未创建关注区域。没有关注区域时可按整图标注。</div>`;
+  $$("[data-focus-edit]", list).forEach(button => button.onclick = () => {
+    const region = state.focusRegions.find(item => item.id === button.dataset.focusEdit);
+    if (!region) return;
+    state.editingFocusId = region.id;
+    state.focusDraft = { x: Number(region.x), y: Number(region.y), w: Number(region.w), h: Number(region.h) };
+    state.focusDraftIsNorm = true;
+    state.focusMode = "focus";
+    $("#focus-region-name").value = region.name;
+    showToast("已进入关注区域编辑模式，拖拽新区域后确认锁定", "info");
+    draw();
+  });
+  $$("[data-focus-delete]", list).forEach(button => button.onclick = async () => {
+    const region = state.focusRegions.find(item => item.id === button.dataset.focusDelete);
+    if (!region) return;
+    if (button.dataset.confirmDelete !== "1") {
+      button.dataset.confirmDelete = "1";
+      button.textContent = "再次点击删除";
+      showToast("再次点击删除按钮确认删除关注区域", "warn");
+      return;
+    }
+    await apiDelete(`/api/focus-regions/${encodeURIComponent(button.dataset.focusDelete)}`);
+    await loadFocusRegions();
+    draw();
+  });
 }
 
 function scheduleSave() {
@@ -394,6 +540,47 @@ function updatePrelabelStatus(message, type = "") {
   el.textContent = message;
   el.dataset.status = type;
 }
+
+$("#focus-new-btn")?.addEventListener("click", () => {
+  if (!currentProjectId()) {
+    showToast("请先选择帧集", "error");
+    return;
+  }
+  state.focusMode = "focus";
+  state.editingFocusId = "";
+  state.focusDraft = null;
+  state.focusDraftIsNorm = false;
+  $("#focus-region-name").value = "";
+  showToast("请在画面上拖拽新关注区域", "info");
+});
+
+$("#focus-confirm-btn")?.addEventListener("click", async () => {
+  try {
+    const projectId = currentProjectId();
+    if (!projectId) throw new Error("请先选择帧集");
+    if (!state.focusDraft || !state.focusDraftIsNorm) throw new Error("请先在画面上拖拽关注区域");
+    const name = $("#focus-region-name").value.trim();
+    if (!name) throw new Error("请填写关注区域名称");
+    await apiPost("/api/focus-regions", {
+      id: state.editingFocusId || undefined,
+      project_id: projectId,
+      name,
+      ...state.focusDraft,
+      enabled: true,
+      locked: true,
+    });
+    state.focusMode = "box";
+    state.editingFocusId = "";
+    state.focusDraft = null;
+    state.focusDraftIsNorm = false;
+    $("#focus-region-name").value = "";
+    await loadFocusRegions();
+    showToast("关注区域已保存并锁定");
+    draw();
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
 
 $("#frame-set-select").addEventListener("change", event => loadFrameSet(event.target.value));
 $("#label-select").addEventListener("change", () => {

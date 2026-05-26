@@ -64,6 +64,20 @@ CREATE TABLE IF NOT EXISTS frame_sets (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS focus_regions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    w REAL NOT NULL,
+    h REAL NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    locked INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS frames (
     id TEXT PRIMARY KEY,
     frame_set_id TEXT NOT NULL REFERENCES frame_sets(id) ON DELETE CASCADE,
@@ -113,6 +127,7 @@ CREATE TABLE IF NOT EXISTS dataset_versions (
     history_dataset_ids_json TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'created',
     summary_json TEXT NOT NULL DEFAULT '{}',
+    metadata_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

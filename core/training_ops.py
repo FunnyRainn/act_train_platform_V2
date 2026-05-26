@@ -225,6 +225,12 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
         "default_weight": default_weight,
         "label_codes": dataset["label_codes"],
         "labels": label_rows,
+        "image_scope": (dataset.get("metadata") or {}).get("image_scope", "full_image"),
+        "focus_region": {
+            "id": (dataset.get("metadata") or {}).get("focus_region_id"),
+            "name": (dataset.get("metadata") or {}).get("focus_region_name"),
+            "rect_norm": (dataset.get("metadata") or {}).get("focus_region_rect_norm"),
+        } if (dataset.get("metadata") or {}).get("focus_region_id") else None,
         "source_product": {"id": project["id"], "name": project["name"], "product_name": project.get("product_name", "")},
         "train_job_id": train_job_id,
         "dataset_version_id": dataset["id"],

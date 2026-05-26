@@ -620,6 +620,56 @@ label.inline input {
   font-size: 12px;
 }
 
+.focus-region-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.focus-region-list {
+  display: grid;
+  gap: 8px;
+  max-height: 170px;
+  overflow: auto;
+}
+
+.focus-region-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px;
+  background: #fbfcff;
+  font-size: 12px;
+}
+
+.focus-region-item span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
+
+.focus-export-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--panel) 92%, var(--bg));
+}
+
+.focus-export-panel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.focus-export-item {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
 .status-ok {
   color: var(--ok);
 }

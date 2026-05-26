@@ -70,3 +70,22 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE train_jobs ADD COLUMN progress_json TEXT NOT NULL DEFAULT '{}'")
     if not _has_column(conn, "train_jobs", "process_id"):
         conn.execute("ALTER TABLE train_jobs ADD COLUMN process_id INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS focus_regions (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            x REAL NOT NULL,
+            y REAL NOT NULL,
+            w REAL NOT NULL,
+            h REAL NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            locked INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    if not _has_column(conn, "dataset_versions", "metadata_json"):
+        conn.execute("ALTER TABLE dataset_versions ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'")

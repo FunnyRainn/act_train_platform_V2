@@ -22,6 +22,17 @@
     <button id="clear-boxes-btn">清空当前画面框</button>
     <div id="save-status" class="row-meta">自动保存就绪</div>
     <hr>
+    <div class="focus-region-panel">
+      <div class="label-title">关注区域 <button class="help-dot" type="button" data-help-key="focus_region">?</button></div>
+      <input id="focus-region-name" placeholder="例如：短边打带区">
+      <div class="button-row">
+        <button id="focus-new-btn" type="button">新建关注区域</button>
+        <button id="focus-confirm-btn" type="button">确认并锁定</button>
+      </div>
+      <div id="focus-region-list" class="focus-region-list"></div>
+      <div class="row-meta">有关注区域时，只允许在区域内标注。区域配置对当前产品全部帧生效。</div>
+    </div>
+    <hr>
     <label>
       <span class="label-title">旧模型路径 <button class="help-dot" type="button" data-help-key="prelabel">?</button></span>
       <input id="prelabel-model" placeholder="D:\models\best.pt">
@@ -50,5 +61,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/annotate.js?v=1.0.0.10"></script>
+<script src="/static/js/annotate.js?v=1.1.0.0"></script>
 {% endblock %}

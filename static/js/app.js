@@ -23,6 +23,11 @@ async function apiPost(url, body) {
   return parseApiResponse(res);
 }
 
+async function apiDelete(url) {
+  const res = await fetch(url, { method: "DELETE" });
+  return parseApiResponse(res);
+}
+
 async function parseApiResponse(res) {
   const contentType = res.headers.get("content-type") || "";
   const data = contentType.includes("application/json") ? await res.json() : await res.text();

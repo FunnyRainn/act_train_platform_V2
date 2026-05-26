@@ -298,6 +298,97 @@ def insert_frames(frame_set_id: str, video_id: str, frame_paths: list[Path]) -> 
             )
 
 
+def _normalize_rect(payload: dict[str, Any]) -> tuple[float, float, float, float]:
+    x = max(0.0, min(1.0, float(payload.get("x") or 0)))
+    y = max(0.0, min(1.0, float(payload.get("y") or 0)))
+    w = max(0.001, min(1.0, float(payload.get("w") or 0.001)))
+    h = max(0.001, min(1.0, float(payload.get("h") or 0.001)))
+    if x + w > 1:
+        w = 1 - x
+    if y + h > 1:
+        h = 1 - y
+    return x, y, max(0.001, w), max(0.001, h)
+
+
+def _rects_overlap(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    ax1, ay1 = float(a["x"]), float(a["y"])
+    ax2, ay2 = ax1 + float(a["w"]), ay1 + float(a["h"])
+    bx1, by1 = float(b["x"]), float(b["y"])
+    bx2, by2 = bx1 + float(b["w"]), by1 + float(b["h"])
+    return max(ax1, bx1) < min(ax2, bx2) and max(ay1, by1) < min(ay2, by2)
+
+
+def list_focus_regions(project_id: str | None = None, enabled_only: bool = False) -> list[dict[str, Any]]:
+    sql = "SELECT * FROM focus_regions"
+    params: list[Any] = []
+    where: list[str] = []
+    if project_id:
+        where.append("project_id=?")
+        params.append(project_id)
+    if enabled_only:
+        where.append("enabled=1")
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY created_at, name"
+    with get_conn() as conn:
+        return rows_to_dicts(conn.execute(sql, params).fetchall())
+
+
+def get_focus_region(region_id: str) -> dict[str, Any]:
+    with get_conn() as conn:
+        row = row_to_dict(conn.execute("SELECT * FROM focus_regions WHERE id=?", (region_id,)).fetchone())
+    if not row:
+        raise KeyError(f"关注区域不存在: {region_id}")
+    return row
+
+
+def save_focus_region(payload: dict[str, Any]) -> dict[str, Any]:
+    project_id = str(payload["project_id"])
+    region_id = payload.get("id") or new_id("focus")
+    name = str(payload.get("name") or "未命名关注区域").strip()
+    x, y, w, h = _normalize_rect(payload)
+    candidate = {"id": region_id, "x": x, "y": y, "w": w, "h": h}
+    for region in list_focus_regions(project_id, enabled_only=True):
+        if region["id"] != region_id and _rects_overlap(candidate, region):
+            raise ValueError(f"关注区域不能重叠：{name} 与 {region['name']} 有重叠")
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO focus_regions(id, project_id, name, x, y, w, h, enabled, locked, updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name,
+                x=excluded.x,
+                y=excluded.y,
+                w=excluded.w,
+                h=excluded.h,
+                enabled=excluded.enabled,
+                locked=excluded.locked,
+                updated_at=excluded.updated_at
+            """,
+            (
+                region_id,
+                project_id,
+                name,
+                x,
+                y,
+                w,
+                h,
+                1 if payload.get("enabled", True) else 0,
+                1 if payload.get("locked", True) else 0,
+                now_text(),
+            ),
+        )
+    return get_focus_region(region_id)
+
+
+def delete_focus_region(region_id: str) -> dict[str, Any]:
+    region = get_focus_region(region_id)
+    with get_conn() as conn:
+        conn.execute("DELETE FROM focus_regions WHERE id=?", (region_id,))
+    return {"id": region_id, "project_id": region["project_id"], "deleted": True}
+
+
 def delete_frame_set(frame_set_id: str) -> dict[str, Any]:
     frame_set = get_frame_set(frame_set_id)
     output_dir = Path(frame_set["output_dir"])
@@ -465,8 +556,8 @@ def save_dataset_version(payload: dict[str, Any]) -> dict[str, Any]:
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO dataset_versions(id, project_id, name, output_dir, label_codes_json, frame_set_ids_json, history_dataset_ids_json, status, summary_json)
-            VALUES(?,?,?,?,?,?,?,?,?)
+            INSERT INTO dataset_versions(id, project_id, name, output_dir, label_codes_json, frame_set_ids_json, history_dataset_ids_json, status, summary_json, metadata_json)
+            VALUES(?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 dataset_id,
@@ -478,6 +569,7 @@ def save_dataset_version(payload: dict[str, Any]) -> dict[str, Any]:
                 json_dumps(payload.get("history_dataset_ids") or []),
                 payload.get("status") or "created",
                 json_dumps(payload.get("summary") or {}),
+                json_dumps(payload.get("metadata") or {}),
             ),
         )
     return get_dataset_version(dataset_id)
@@ -492,6 +584,7 @@ def get_dataset_version(dataset_id: str) -> dict[str, Any]:
     row["frame_set_ids"] = json_loads(row.pop("frame_set_ids_json"), [])
     row["history_dataset_ids"] = json_loads(row.pop("history_dataset_ids_json"), [])
     row["summary"] = json_loads(row.pop("summary_json"), {})
+    row["metadata"] = json_loads(row.pop("metadata_json"), {})
     return row
 
 
@@ -509,6 +602,7 @@ def list_dataset_versions(project_id: str | None = None) -> list[dict[str, Any]]
         row["frame_set_ids"] = json_loads(row.pop("frame_set_ids_json"), [])
         row["history_dataset_ids"] = json_loads(row.pop("history_dataset_ids_json"), [])
         row["summary"] = json_loads(row.pop("summary_json"), {})
+        row["metadata"] = json_loads(row.pop("metadata_json"), {})
     return rows
 
 

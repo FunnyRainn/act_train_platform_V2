@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.0.0.12`
+`v1.1.0.0`
 
 ## Repository
 
@@ -188,3 +188,17 @@ Annotation frame-load and pre-label count follow-up:
 - Adds a frame image load token so stale image-load callbacks cannot overwrite the currently selected frame's annotation boxes.
 - Keeps pre-label completion text based on database totals while also showing the current frame's pre-label count after reload.
 - Preserves the confirmed-only dataset export rule for pre-label boxes.
+
+## v1.1.0.0
+
+Focus-region training dataset release:
+
+- Adds product/workstation focus-region management in the annotation workspace.
+- Lets annotators draw, name, confirm, lock, edit, and delete non-overlapping focus regions.
+- Dims content outside configured focus regions and blocks new or edited boxes outside the valid focus area.
+- Marks legacy boxes outside focus regions as invalid for focus-region export without deleting historical annotations.
+- Reworks dataset export so users can create full-image datasets, focus-region cropped datasets, or history-only merged datasets.
+- Generates one independent dataset version for each selected focus region, with per-region historical dataset mixing.
+- Crops focus-region images and translates bbox labels into the cropped coordinate system.
+- Records `image_scope`, focus-region metadata, source size, label codes, and history sources in dataset metadata.
+- Writes focus-region metadata into exported model manifests so inference can crop the same view before running the model.
