@@ -3,11 +3,11 @@ let datasetData = null;
 function datasetSummaryText(summary) {
   const modeText = summary.export_mode === "annotated_only" ? "只导出已标注帧" : "已确认标注";
   const historyText = Number(summary.history_images || 0) > 0
-    ? `历史混入: ${summary.history_images}张/${summary.history_boxes || 0}框`
+    ? `历史混入: ${summary.history_images}张 ${summary.history_boxes || 0}框`
     : "历史混入: 无";
   return [
     `模式: ${modeText}`,
-    `当前帧: ${summary.current_frames || 0}张/${summary.current_boxes || 0}框`,
+    `当前帧: ${summary.current_frames || 0}张 ${summary.current_boxes || 0}框`,
     historyText,
     `已确认预标注: ${summary.confirmed_prelabel_boxes || 0}框`,
     `跳过未确认预标注: ${summary.skipped_unconfirmed_prelabel_boxes || 0}框`,
@@ -25,6 +25,14 @@ function datasetScopeText(ds) {
   return "整图";
 }
 
+function projectFrameSets(projectId) {
+  return (datasetData?.frame_sets || []).filter(item => item.project_id === projectId);
+}
+
+function projectDatasets(projectId) {
+  return (datasetData?.datasets || []).filter(item => item.project_id === projectId);
+}
+
 function renderFocusExportPanel() {
   const panel = $("#focus-export-panel");
   const list = $("#focus-export-list");
@@ -34,7 +42,7 @@ function renderFocusExportPanel() {
   panel.classList.toggle("hidden", scope !== "focus_region_crop");
   if (scope !== "focus_region_crop") return;
   const regions = (datasetData?.focus_regions || []).filter(item => item.project_id === projectId && Number(item.enabled) !== 0);
-  const histories = (datasetData?.datasets || []).filter(item => item.project_id === projectId);
+  const histories = projectDatasets(projectId);
   list.innerHTML = regions.length ? regions.map(region => `
     <div class="focus-export-item">
       <label class="inline"><input type="checkbox" data-focus-region="${esc(region.id)}"> ${esc(region.name)}</label>
@@ -45,12 +53,21 @@ function renderFocusExportPanel() {
   `).join("") : `<div class="notice">当前产品还没有关注区域，请先到标注工作台创建并锁定关注区域。</div>`;
 }
 
+function renderDatasetSourceOptions() {
+  const projectId = $("#dataset-form select[name=project_id]").value;
+  fillMultiSelect($("#dataset-form select[name=frame_set_ids]"), projectFrameSets(projectId), item => item.id, item => `${item.name} (${item.frame_count}帧)`);
+  fillMultiSelect($("#dataset-form select[name=history_dataset_ids]"), projectDatasets(projectId), item => item.id, item => `${item.name} (${item.status}) | ${datasetScopeText(item)}`);
+  renderFocusExportPanel();
+}
+
 async function refreshDatasets() {
   const data = await loadBootstrap();
   datasetData = data;
-  fillSelect($("#dataset-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
-  fillMultiSelect($("#dataset-form select[name=frame_set_ids]"), data.frame_sets, item => item.id, item => `${item.name} (${item.frame_count}帧)`);
-  fillMultiSelect($("#dataset-form select[name=history_dataset_ids]"), data.datasets, item => item.id, item => `${item.name} (${item.status}) | ${datasetScopeText(item)}`);
+  const projectSelect = $("#dataset-form select[name=project_id]");
+  const previousProject = projectSelect.value;
+  fillSelect(projectSelect, data.projects, item => item.id, item => item.name, "选择产品");
+  if (previousProject && data.projects.some(item => item.id === previousProject)) projectSelect.value = previousProject;
+  renderDatasetSourceOptions();
   $("#dataset-list").innerHTML = data.datasets.map(ds => {
     const summary = ds.summary || {};
     return rowHtml(
@@ -58,7 +75,6 @@ async function refreshDatasets() {
       `状态: ${esc(ds.status)} | 视野: ${esc(datasetScopeText(ds))} | ${esc(datasetSummaryText(summary))} | 标签: ${esc(ds.label_codes.join(", "))} | ${esc(ds.output_dir)}`
     );
   }).join("");
-  renderFocusExportPanel();
 }
 
 function collectFocusExportConfig(payload) {
@@ -117,7 +133,7 @@ $("#export-annotated-only").addEventListener("click", async () => {
   }
 });
 
-$("#dataset-form select[name=project_id]").addEventListener("change", renderFocusExportPanel);
+$("#dataset-form select[name=project_id]").addEventListener("change", renderDatasetSourceOptions);
 $("#dataset-image-scope").addEventListener("change", renderFocusExportPanel);
 
 refreshDatasets();

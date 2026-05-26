@@ -645,8 +645,17 @@ label.inline input {
 }
 
 .focus-region-item span {
-  grid-column: 1 / -1;
-  color: var(--muted);
+    grid-column: 1 / -1;
+    color: var(--muted);
+}
+
+.focus-region-item.editing {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+#bbox-canvas {
+    cursor: crosshair;
 }
 
 .focus-export-panel {

@@ -9,9 +9,9 @@
 </section>
 <section class="layout-two">
   <form class="panel form" id="dataset-form">
-    <h2>导出数据集</h2>
+    <h2>创建训练数据集</h2>
     <label>产品<select name="project_id"></select></label>
-    <label>版本名称<input name="name" value="训练数据集 v1"></label>
+    <label>版本名称<input name="name" value="训练数据集-v1"></label>
     <label>帧集<select name="frame_set_ids" multiple size="10"></select></label>
     <label>导出视野
       <select name="image_scope" id="dataset-image-scope">
@@ -38,5 +38,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/datasets.js?v=1.1.0.0"></script>
+<script src="/static/js/datasets.js?v=1.1.0.1"></script>
 {% endblock %}

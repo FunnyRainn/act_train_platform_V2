@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.1.0.0`
+`v1.1.0.1`
 
 ## Repository
 
@@ -202,3 +202,13 @@ Focus-region training dataset release:
 - Crops focus-region images and translates bbox labels into the cropped coordinate system.
 - Records `image_scope`, focus-region metadata, source size, label codes, and history sources in dataset metadata.
 - Writes focus-region metadata into exported model manifests so inference can crop the same view before running the model.
+
+## v1.1.0.1
+
+Focus-region editor stability fix:
+
+- Fixes focus-region drawing coordinate drift by keeping image display, canvas, and normalized coordinates in sync.
+- Lets users edit an existing focus region by dragging or resizing it like a normal annotation box.
+- Adds cancel editing for focus regions so changes are not saved until explicitly confirmed.
+- Keeps validation for minimum size, bounds, and non-overlap before saving.
+- Rewrites the annotation and dataset export pages with clean Chinese text after legacy mojibake affected customer-facing labels.

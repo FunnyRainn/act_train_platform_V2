@@ -16,6 +16,8 @@
   editingFocusId: "",
   focusDraft: null,
   focusDraftIsNorm: false,
+  focusDrag: null,
+  focusOriginal: null,
 };
 
 const canvas = $("#bbox-canvas");
@@ -117,6 +119,7 @@ function fitCanvas() {
   canvas.style.top = `${image.offsetTop}px`;
   canvas.style.width = `${rect.width}px`;
   canvas.style.height = `${rect.height}px`;
+  canvas.style.display = image.style.display === "block" ? "block" : "none";
 }
 
 async function loadBoxes(frameId = null, token = state.imageLoadToken) {
@@ -256,10 +259,59 @@ function hitTest(point) {
   return null;
 }
 
+function hitTestRect(point, rect) {
+  if (!rect) return null;
+  const box = toPixelBox(rect);
+  const inside = point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h;
+  if (!inside) return null;
+  const edge = 10;
+  let mode = "move";
+  if (Math.abs(point.x - box.x) < edge) mode = "w";
+  if (Math.abs(point.x - (box.x + box.w)) < edge) mode = "e";
+  if (Math.abs(point.y - box.y) < edge) mode += "n";
+  if (Math.abs(point.y - (box.y + box.h)) < edge) mode += "s";
+  return mode;
+}
+
+function dragNormRect(original, drag, point) {
+  const rect = { ...original };
+  const dx = (point.x - drag.start.x) / canvas.width;
+  const dy = (point.y - drag.start.y) / canvas.height;
+  if (drag.mode === "move") {
+    rect.x += dx;
+    rect.y += dy;
+  } else {
+    if (drag.mode.includes("w")) { rect.x += dx; rect.w -= dx; }
+    if (drag.mode.includes("e")) { rect.w += dx; }
+    if (drag.mode.includes("n")) { rect.y += dy; rect.h -= dy; }
+    if (drag.mode.includes("s")) { rect.h += dy; }
+  }
+  return clampBox(rect);
+}
+
+function resetFocusEditing() {
+  state.focusMode = "box";
+  state.editingFocusId = "";
+  state.focusDraft = null;
+  state.focusDraftIsNorm = false;
+  state.focusDrag = null;
+  state.focusOriginal = null;
+  const input = $("#focus-region-name");
+  if (input) input.value = "";
+}
+
 canvas.addEventListener("mousedown", event => {
   if (!state.frameSetId || !currentFrame()) return;
   const p = pointer(event);
   if (state.focusMode === "focus") {
+    if (state.focusDraft && state.focusDraftIsNorm) {
+      const mode = hitTestRect(p, state.focusDraft);
+      if (mode) {
+        state.focusDrag = { mode, start: p, original: { ...state.focusDraft } };
+        return;
+      }
+      if (state.editingFocusId) return;
+    }
     state.focusDraft = { x: p.x, y: p.y, w: 0, h: 0 };
     state.focusDraftIsNorm = false;
     state.drawing = null;
@@ -278,6 +330,12 @@ canvas.addEventListener("mousedown", event => {
 
 canvas.addEventListener("mousemove", event => {
   const p = pointer(event);
+  if (state.focusDrag) {
+    state.focusDraft = dragNormRect(state.focusDrag.original, state.focusDrag, p);
+    state.focusDraftIsNorm = true;
+    draw();
+    return;
+  }
   if (state.focusDraft) {
     state.focusDraft.w = p.x - state.focusDraft.x;
     state.focusDraft.h = p.y - state.focusDraft.y;
@@ -295,7 +353,20 @@ canvas.addEventListener("mousemove", event => {
 });
 
 window.addEventListener("mouseup", () => {
+  if (state.focusDrag) {
+    state.focusDrag = null;
+    draw();
+    return;
+  }
   if (state.focusDraft) {
+    if (state.focusDraftIsNorm) {
+      if (state.focusDraft.w < 0.01 || state.focusDraft.h < 0.01) {
+        state.focusDraft = state.focusOriginal ? { ...state.focusOriginal } : null;
+        showToast("关注区域太小，已恢复原区域", "error");
+      }
+      draw();
+      return;
+    }
     const rect = normalizePixelRect(state.focusDraft);
     state.focusDraft = null;
     state.focusDraftIsNorm = true;
@@ -439,7 +510,7 @@ function renderFocusRegions() {
   if (!list) return;
   const regions = focusRegionsForCurrentProject();
   list.innerHTML = regions.length ? regions.map(region => `
-    <div class="focus-region-item">
+    <div class="focus-region-item ${region.id === state.editingFocusId ? "editing" : ""}">
       <strong>${esc(region.name)}</strong>
       <span>${Number(region.x).toFixed(3)}, ${Number(region.y).toFixed(3)}, ${Number(region.w).toFixed(3)}, ${Number(region.h).toFixed(3)}</span>
       <button type="button" data-focus-edit="${esc(region.id)}">编辑</button>
@@ -452,9 +523,11 @@ function renderFocusRegions() {
     state.editingFocusId = region.id;
     state.focusDraft = { x: Number(region.x), y: Number(region.y), w: Number(region.w), h: Number(region.h) };
     state.focusDraftIsNorm = true;
+    state.focusOriginal = { ...state.focusDraft };
+    state.focusDrag = null;
     state.focusMode = "focus";
     $("#focus-region-name").value = region.name;
-    showToast("已进入关注区域编辑模式，拖拽新区域后确认锁定", "info");
+    showToast("已进入关注区域编辑模式，可拖动或缩放后确认锁定", "info");
     draw();
   });
   $$("[data-focus-delete]", list).forEach(button => button.onclick = async () => {
@@ -550,6 +623,8 @@ $("#focus-new-btn")?.addEventListener("click", () => {
   state.editingFocusId = "";
   state.focusDraft = null;
   state.focusDraftIsNorm = false;
+  state.focusDrag = null;
+  state.focusOriginal = null;
   $("#focus-region-name").value = "";
   showToast("请在画面上拖拽新关注区域", "info");
 });
@@ -580,6 +655,19 @@ $("#focus-confirm-btn")?.addEventListener("click", async () => {
   } catch (error) {
     showToast(error.message, "error");
   }
+});
+
+$("#focus-cancel-btn")?.addEventListener("click", () => {
+  resetFocusEditing();
+  showToast("已取消关注区域编辑", "info");
+  renderFocusRegions();
+  draw();
+});
+
+window.addEventListener("resize", () => {
+  if (image.style.display !== "block") return;
+  fitCanvas();
+  draw();
 });
 
 $("#frame-set-select").addEventListener("change", event => loadFrameSet(event.target.value));

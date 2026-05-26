@@ -28,9 +28,10 @@
       <div class="button-row">
         <button id="focus-new-btn" type="button">新建关注区域</button>
         <button id="focus-confirm-btn" type="button">确认并锁定</button>
+        <button id="focus-cancel-btn" type="button">取消编辑</button>
       </div>
       <div id="focus-region-list" class="focus-region-list"></div>
-      <div class="row-meta">有关注区域时，只允许在区域内标注。区域配置对当前产品全部帧生效。</div>
+      <div class="row-meta">存在关注区域时，只允许在区域内标注。编辑关注区域需要先从列表点击“编辑”，确认后对当前产品全部帧生效。</div>
     </div>
     <hr>
     <label>
@@ -61,5 +62,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/annotate.js?v=1.1.0.0"></script>
+<script src="/static/js/annotate.js?v=1.1.0.1"></script>
 {% endblock %}
