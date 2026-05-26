@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.1.0.1`
+`v1.1.0.2`
 
 ## Repository
 
@@ -212,3 +212,11 @@ Focus-region editor stability fix:
 - Adds cancel editing for focus regions so changes are not saved until explicitly confirmed.
 - Keeps validation for minimum size, bounds, and non-overlap before saving.
 - Rewrites the annotation and dataset export pages with clean Chinese text after legacy mojibake affected customer-facing labels.
+
+## v1.1.0.2
+
+Focus-region drawing state fix:
+
+- Separates pixel drawing state from normalized focus-region draft state so a completed region no longer stretches toward the lower-right corner when the mouse moves.
+- Keeps existing focus-region editing behavior: edit from the list, drag or resize, cancel, then confirm and lock.
+- Removes the canvas full-container sizing conflict so pointer coordinates stay aligned with the displayed frame.

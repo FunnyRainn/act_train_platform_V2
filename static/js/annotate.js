@@ -18,6 +18,7 @@
   focusDraftIsNorm: false,
   focusDrag: null,
   focusOriginal: null,
+  focusDrawing: false,
 };
 
 const canvas = $("#bbox-canvas");
@@ -296,6 +297,7 @@ function resetFocusEditing() {
   state.focusDraftIsNorm = false;
   state.focusDrag = null;
   state.focusOriginal = null;
+  state.focusDrawing = false;
   const input = $("#focus-region-name");
   if (input) input.value = "";
 }
@@ -314,6 +316,7 @@ canvas.addEventListener("mousedown", event => {
     }
     state.focusDraft = { x: p.x, y: p.y, w: 0, h: 0 };
     state.focusDraftIsNorm = false;
+    state.focusDrawing = true;
     state.drawing = null;
     return;
   }
@@ -336,7 +339,7 @@ canvas.addEventListener("mousemove", event => {
     draw();
     return;
   }
-  if (state.focusDraft) {
+  if (state.focusDraft && state.focusDrawing && !state.focusDraftIsNorm) {
     state.focusDraft.w = p.x - state.focusDraft.x;
     state.focusDraft.h = p.y - state.focusDraft.y;
     draw();
@@ -367,9 +370,13 @@ window.addEventListener("mouseup", () => {
       draw();
       return;
     }
+    if (!state.focusDrawing) {
+      return;
+    }
     const rect = normalizePixelRect(state.focusDraft);
     state.focusDraft = null;
     state.focusDraftIsNorm = true;
+    state.focusDrawing = false;
     const box = toNormBox(rect);
     if (box.w < 0.01 || box.h < 0.01) {
       showToast("关注区域太小，已忽略", "error");
@@ -525,6 +532,7 @@ function renderFocusRegions() {
     state.focusDraftIsNorm = true;
     state.focusOriginal = { ...state.focusDraft };
     state.focusDrag = null;
+    state.focusDrawing = false;
     state.focusMode = "focus";
     $("#focus-region-name").value = region.name;
     showToast("已进入关注区域编辑模式，可拖动或缩放后确认锁定", "info");
@@ -625,6 +633,7 @@ $("#focus-new-btn")?.addEventListener("click", () => {
   state.focusDraftIsNorm = false;
   state.focusDrag = null;
   state.focusOriginal = null;
+  state.focusDrawing = false;
   $("#focus-region-name").value = "";
   showToast("请在画面上拖拽新关注区域", "info");
 });
@@ -648,6 +657,7 @@ $("#focus-confirm-btn")?.addEventListener("click", async () => {
     state.editingFocusId = "";
     state.focusDraft = null;
     state.focusDraftIsNorm = false;
+    state.focusDrawing = false;
     $("#focus-region-name").value = "";
     await loadFocusRegions();
     showToast("关注区域已保存并锁定");
