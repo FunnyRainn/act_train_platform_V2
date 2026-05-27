@@ -53,7 +53,80 @@ def _crop_image_to_region(src: Path, dst: Path, region: dict) -> tuple[int, int]
     y2 = max(y1 + 1, min(height, int(round((float(region["y"]) + float(region["h"])) * height))))
     dst.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(dst), image[y1:y2, x1:x2])
-    return width, height
+    return x2 - x1, y2 - y1
+
+
+def _read_image_size(path: Path) -> tuple[int, int] | None:
+    image = cv2.imread(str(path))
+    if image is None:
+        return None
+    height, width = image.shape[:2]
+    return int(width), int(height)
+
+
+def _new_size_stats() -> dict:
+    return {
+        "count": 0,
+        "width_sum": 0,
+        "height_sum": 0,
+        "long_edge_sum": 0,
+        "width_min": None,
+        "width_max": 0,
+        "height_min": None,
+        "height_max": 0,
+        "long_edge_max": 0,
+    }
+
+
+def _add_size(stats: dict, width: int, height: int) -> None:
+    width = int(width)
+    height = int(height)
+    long_edge = max(width, height)
+    stats["count"] += 1
+    stats["width_sum"] += width
+    stats["height_sum"] += height
+    stats["long_edge_sum"] += long_edge
+    stats["width_min"] = width if stats["width_min"] is None else min(stats["width_min"], width)
+    stats["width_max"] = max(stats["width_max"], width)
+    stats["height_min"] = height if stats["height_min"] is None else min(stats["height_min"], height)
+    stats["height_max"] = max(stats["height_max"], height)
+    stats["long_edge_max"] = max(stats["long_edge_max"], long_edge)
+
+
+def _recommend_imgsz(long_edge: float) -> int:
+    if long_edge <= 384:
+        value = 320
+    elif long_edge <= 640:
+        value = 512
+    elif long_edge <= 960:
+        value = 640
+    elif long_edge <= 1280:
+        value = 960
+    else:
+        value = 1280
+    value = max(320, int(round(value / 32)) * 32)
+    return value
+
+
+def _finish_size_stats(stats: dict) -> dict:
+    count = int(stats.get("count") or 0)
+    if count <= 0:
+        return {"count": 0, "recommended_imgsz": 1280}
+    avg_width = stats["width_sum"] / count
+    avg_height = stats["height_sum"] / count
+    avg_long_edge = stats["long_edge_sum"] / count
+    return {
+        "count": count,
+        "width_min": stats["width_min"],
+        "width_max": stats["width_max"],
+        "width_avg": round(avg_width, 2),
+        "height_min": stats["height_min"],
+        "height_max": stats["height_max"],
+        "height_avg": round(avg_height, 2),
+        "long_edge_avg": round(avg_long_edge, 2),
+        "long_edge_max": stats["long_edge_max"],
+        "recommended_imgsz": _recommend_imgsz(avg_long_edge),
+    }
 
 
 def _require_history_structure(dataset: dict) -> Path:
@@ -98,6 +171,7 @@ def _copy_history_dataset(
     labels_by_split: dict[str, Path],
     current_class_map: dict[str, int],
     counts: dict,
+    size_stats: dict,
 ) -> None:
     output_dir = _require_history_structure(dataset)
     history_label_codes = dataset["label_codes"]
@@ -122,6 +196,9 @@ def _copy_history_dataset(
                 continue
             dst_img = images_by_split[split] / f"{stem}{src_img.suffix.lower()}"
             shutil.copy2(src_img, dst_img)
+            copied_size = _read_image_size(dst_img)
+            if copied_size:
+                _add_size(size_stats, copied_size[0], copied_size[1])
             counts[split] += 1
             counts["boxes"] += box_count
             counts["history_images"] += 1
@@ -249,6 +326,8 @@ def _export_one_dataset(
         "skipped_history_empty_label": 0,
         "export_mode": "annotated_only" if annotated_only else "confirmed_annotations",
     }
+    size_stats = _new_size_stats()
+    source_frame_sizes: set[tuple[int, int]] = set()
     for frame_id, split in split_map.items():
         frame = frame_lookup[frame_id]
         raw_anns = [ann for ann in store.list_annotations(frame_set_by_frame[frame_id], frame_id) if ann["label_code"] in class_map]
@@ -271,10 +350,14 @@ def _export_one_dataset(
         dst_label = labels_by_split[split] / f"{stem}.txt"
         if focus_region is None:
             shutil.copy2(src, dst_img)
-            source_frame_size = [int(frame.get("width") or 0), int(frame.get("height") or 0)]
+            exported_size = _read_image_size(dst_img)
+            source_frame_sizes.add((int(frame.get("width") or 0), int(frame.get("height") or 0)))
         else:
-            width, height = _crop_image_to_region(src, dst_img, focus_region)
-            source_frame_size = [width, height]
+            crop_width, crop_height = _crop_image_to_region(src, dst_img, focus_region)
+            exported_size = (crop_width, crop_height)
+            source_frame_sizes.add((int(frame.get("width") or 0), int(frame.get("height") or 0)))
+        if exported_size:
+            _add_size(size_stats, exported_size[0], exported_size[1])
         dst_label.write_text("\n".join(_yolo_line(class_map[ann["label_code"]], ann) for ann in anns), encoding="utf-8")
         counts[split] += 1
         counts["boxes"] += len(anns)
@@ -284,7 +367,7 @@ def _export_one_dataset(
     for history_dataset_id in history_dataset_ids:
         history_dataset = store.get_dataset_version(history_dataset_id)
         counts["scope_warnings"].extend(_validate_history_scope(history_dataset, image_scope, focus_region["id"] if focus_region else None, force_mixed_scope))
-        _copy_history_dataset(history_dataset, images_by_split, labels_by_split, class_map, counts)
+        _copy_history_dataset(history_dataset, images_by_split, labels_by_split, class_map, counts, size_stats)
 
     if counts["current_frames"] + counts["history_images"] <= 0:
         raise ValueError("没有可导出的已确认标注帧或历史数据集内容")
@@ -297,12 +380,18 @@ def _export_one_dataset(
         "names": {idx: code for code, idx in class_map.items()},
     }
     (output_dir / "dataset.generated.yaml").write_text(yaml.safe_dump(dataset_yaml, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    image_size_stats = _finish_size_stats(size_stats)
+    counts["image_size_stats"] = image_size_stats
+    counts["recommended_imgsz"] = image_size_stats.get("recommended_imgsz")
     metadata = {
         "image_scope": image_scope,
         "focus_region_id": focus_region["id"] if focus_region else None,
         "focus_region_name": focus_region["name"] if focus_region else None,
         "focus_region_rect_norm": [focus_region["x"], focus_region["y"], focus_region["w"], focus_region["h"]] if focus_region else None,
-        "source_frame_size": source_frame_size if "source_frame_size" in locals() else None,
+        "source_frame_size": list(next(iter(source_frame_sizes))) if len(source_frame_sizes) == 1 else None,
+        "source_frame_sizes": [list(item) for item in sorted(source_frame_sizes) if item[0] and item[1]],
+        "image_size_stats": image_size_stats,
+        "recommended_imgsz": image_size_stats.get("recommended_imgsz"),
         "crop_policy": "strict_inside_translate" if focus_region else "none",
         "history_dataset_ids": history_dataset_ids,
         "label_codes": label_codes,

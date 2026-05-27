@@ -19,7 +19,18 @@ from .utils import clean_dir, new_id, now_text, safe_name
 
 
 def create_train_job(project_id: str, dataset_version_id: str, name: str, base_model_path: str, params: dict[str, Any]) -> dict:
-    store.get_dataset_version(dataset_version_id)
+    dataset = store.get_dataset_version(dataset_version_id)
+    params = dict(params or {})
+    dataset_metadata = dataset.get("metadata") or {}
+    recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or (dataset.get("summary") or {}).get("recommended_imgsz") or 1280)
+    raw_imgsz = params.get("imgsz")
+    if raw_imgsz in {None, "", 0, "0", "auto"}:
+        params["imgsz"] = recommended_imgsz
+        params["auto_imgsz"] = True
+    else:
+        params["imgsz"] = int(raw_imgsz)
+        params["auto_imgsz"] = False
+    params["recommended_imgsz"] = recommended_imgsz
     job_id = new_id("train")
     output_dir = RUNS_DIR / project_id / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -218,6 +229,9 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
     (package_dir / "labels.yaml").write_text(yaml.safe_dump({"names": label_names}, allow_unicode=True, sort_keys=False), encoding="utf-8")
     (package_dir / "label_policy.json").write_text(json.dumps(label_rows, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    dataset_metadata = dataset.get("metadata") or {}
+    recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or job["params"].get("recommended_imgsz") or job["params"].get("imgsz") or 1280)
+    trained_imgsz = int(job["params"].get("imgsz") or recommended_imgsz)
     manifest = {
         "schema_version": "1.0",
         "package_id": package_id,
@@ -234,8 +248,10 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
         "source_product": {"id": project["id"], "name": project["name"], "product_name": project.get("product_name", "")},
         "train_job_id": train_job_id,
         "dataset_version_id": dataset["id"],
+        "recommended_imgsz": recommended_imgsz,
+        "trained_imgsz": trained_imgsz,
         "recommended": {
-            "imgsz": int(job["params"].get("imgsz") or 1280),
+            "imgsz": trained_imgsz,
             "conf": float(job["params"].get("conf") or 0.35),
         },
         "created_at": now_text(),

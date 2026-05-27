@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.1.0.2`
+`v1.1.0.3`
 
 ## Repository
 
@@ -220,3 +220,12 @@ Focus-region drawing state fix:
 - Separates pixel drawing state from normalized focus-region draft state so a completed region no longer stretches toward the lower-right corner when the mouse moves.
 - Keeps existing focus-region editing behavior: edit from the list, drag or resize, cancel, then confirm and lock.
 - Removes the canvas full-container sizing conflict so pointer coordinates stay aligned with the displayed frame.
+
+## v1.1.0.3
+
+Input-size automation for focus-region datasets:
+
+- Records exported dataset image-size statistics, including average/max long edge and recommended input size.
+- Recommends smaller training input sizes for focus-region cropped datasets while keeping a minimum of 320 and 32-pixel alignment.
+- Lets training jobs use the dataset recommended input size by default when the operator leaves the input-size field blank.
+- Writes `recommended_imgsz` and `trained_imgsz` into exported model manifests so `act_server` can infer with the same scale used during training.

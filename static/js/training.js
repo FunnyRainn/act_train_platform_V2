@@ -72,6 +72,34 @@ function fillTrainSelects(data, state) {
   fillSelect($("#train-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
   fillSelect($("#train-form select[name=dataset_version_id]"), data.datasets, item => item.id, item => `${item.name} (${item.status})`, "选择训练数据集");
   restoreTrainFormState(state);
+  updateImgSizeRecommendation(data.datasets);
+}
+
+function datasetRecommendedImgsz(dataset) {
+  const metadata = dataset?.metadata || {};
+  const summary = dataset?.summary || {};
+  return Number(
+    metadata.recommended_imgsz
+      || summary.recommended_imgsz
+      || metadata.image_size_stats?.recommended_imgsz
+      || summary.image_size_stats?.recommended_imgsz
+      || 0
+  );
+}
+
+function updateImgSizeRecommendation(datasets) {
+  const form = $("#train-form");
+  const hint = $("#imgsz-recommendation");
+  if (!form || !hint) return;
+  const dataset = (datasets || []).find(item => item.id === form.dataset_version_id.value);
+  const recommended = datasetRecommendedImgsz(dataset);
+  const stats = dataset?.metadata?.image_size_stats || dataset?.summary?.image_size_stats || {};
+  if (recommended) {
+    const longEdge = stats.long_edge_avg ? `，平均长边 ${stats.long_edge_avg}` : "";
+    hint.textContent = `推荐输入尺寸：${recommended}${longEdge}。留空会自动使用推荐值；手动填写则覆盖。`;
+  } else {
+    hint.textContent = "输入尺寸默认按训练数据集图片尺寸自动推荐；需要时可手动填写覆盖。";
+  }
 }
 
 function statusText(status) {
@@ -151,7 +179,7 @@ $("#train-form").addEventListener("submit", async event => {
       base_model_path: form.base_model_path.value,
       params: {
         epochs: Number(form.epochs.value),
-        imgsz: Number(form.imgsz.value),
+        imgsz: form.imgsz.value ? Number(form.imgsz.value) : null,
         batch: Number(form.batch.value),
         device: form.device.value,
       },
@@ -160,6 +188,15 @@ $("#train-form").addEventListener("submit", async event => {
     await refreshTraining();
   } catch (error) {
     showToast(error.message, "error");
+  }
+});
+
+$("#train-form select[name=dataset_version_id]").addEventListener("change", async event => {
+  try {
+    const data = await loadBootstrap();
+    updateImgSizeRecommendation(data.datasets);
+  } catch (_) {
+    $("#imgsz-recommendation").textContent = "输入尺寸默认按训练数据集图片尺寸自动推荐；需要时可手动填写覆盖。";
   }
 });
 
