@@ -68,7 +68,7 @@ preview_examples/
 第一阶段不做网络分发。导出后人工复制到推理服务器，例如：
 
 ```text
-D:\pie_ai_server\models\某模型包\
+D:\poioeo_ai_server\models\某模型包\
 ```
 
 然后在 `act_server` 侧配置使用该 `best.pt`。
