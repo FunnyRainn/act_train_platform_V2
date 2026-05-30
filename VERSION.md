@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.1.0.4`
+`v1.2.0.0`
 
 ## Repository
 
@@ -78,6 +78,17 @@ Future versions should focus on:
 Packaging release:
 
 - Added `scripts/package_act_train_platform.ps1` for one-command PyInstaller packaging.
+
+## v1.2.0.0
+
+Architecture governance release with no intended behavior changes:
+
+- Moves FastAPI construction into `web/app_factory.py` and routes into `web/routes/`.
+- Splits SQLite access behind `core/repositories/` while keeping `core.store` as a compatibility facade.
+- Moves dataset export, media, annotation, pre-labeling, and training implementations into domain packages under `core/`.
+- Keeps old module names such as `core.dataset_ops`, `core.video_ops`, and `core.training_ops` as compatibility shims.
+- Moves the annotation and dataset page implementations under page-specific frontend directories while keeping the original entry scripts as bootstraps.
+- Updates architecture documentation to describe the new module responsibilities.
 - The packaged application creates an empty runtime `data/` directory structure and does not bundle local videos, datasets, databases, training runs, or model packages.
 - Base model files in the project root, such as `yolo11m.pt` and `yolo26n.pt`, are copied beside the packaged executable so the default training form can run after deployment.
 - Added packaged training-worker support through `act_train_platform.exe --train-worker <job_id>`, so training jobs still run as child processes after the app is packaged.
