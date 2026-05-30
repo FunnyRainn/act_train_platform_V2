@@ -16,7 +16,7 @@ from core.db import init_db
 from core.paths import PROJECT_ROOT
 
 
-app = FastAPI(title="act_train_platform", version="1.1.0.3")
+app = FastAPI(title="act_train_platform", version="1.1.0.4")
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
 app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
 
@@ -27,7 +27,7 @@ def on_startup() -> None:
 
 
 def page(request: Request, template: str, **context: Any) -> HTMLResponse:
-    context.setdefault("version", "v1.1.0.3")
+    context.setdefault("version", "v1.1.0.4")
     return templates.TemplateResponse(request, template, context)
 
 
@@ -393,7 +393,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="启动 act_train_platform")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=18100)
+    parser.add_argument("--train-worker", help="internal training worker job id")
     args = parser.parse_args()
+    if args.train_worker:
+        from core import train_worker
+
+        init_db()
+        train_worker.run(args.train_worker)
+        return
     uvicorn.run("app:app", host=args.host, port=args.port, reload=False)
 
 

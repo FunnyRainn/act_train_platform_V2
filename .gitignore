@@ -5,6 +5,9 @@ __pycache__/
 .vscode/
 data/
 runs/
+build/
+dist/
+*.spec
 *.db
 *.log
 *.pt

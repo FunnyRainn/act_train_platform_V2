@@ -49,8 +49,12 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
     )
     env = os.environ.copy()
     env.setdefault("PYTHONIOENCODING", "utf-8")
+    if getattr(sys, "frozen", False):
+        worker_command = [sys.executable, "--train-worker", job_id]
+    else:
+        worker_command = [sys.executable, "-m", "core.train_worker", job_id]
     process = subprocess.Popen(
-        [sys.executable, "-m", "core.train_worker", job_id],
+        worker_command,
         cwd=str(PROJECT_ROOT),
         env=env,
         stdout=subprocess.DEVNULL,

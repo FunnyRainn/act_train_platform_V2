@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.1.0.3`
+`v1.1.0.4`
 
 ## Repository
 
@@ -72,6 +72,16 @@ Future versions should focus on:
 - Multiple model deployment profiles.
 - Network-based model distribution to inference hosts.
 - Training queue isolation and GPU resource scheduling.
+
+## v1.1.0.4
+
+Packaging release:
+
+- Added `scripts/package_act_train_platform.ps1` for one-command PyInstaller packaging.
+- The packaged application creates an empty runtime `data/` directory structure and does not bundle local videos, datasets, databases, training runs, or model packages.
+- Base model files in the project root, such as `yolo11m.pt` and `yolo26n.pt`, are copied beside the packaged executable so the default training form can run after deployment.
+- Added packaged training-worker support through `act_train_platform.exe --train-worker <job_id>`, so training jobs still run as child processes after the app is packaged.
+- Added `docs/PACKAGING.md` with deployment commands and data migration notes.
 
 ## v1.0.0.1
 
