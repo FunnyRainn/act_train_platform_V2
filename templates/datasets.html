@@ -36,7 +36,32 @@
     <div id="dataset-list" class="table-list"></div>
   </section>
 </section>
+<section class="layout-two">
+  <form class="panel form" id="yolo-import-form">
+    <h2>导入外部 YOLO 数据集</h2>
+    <label>产品<select name="project_id"></select></label>
+    <label>数据集名称<input name="name" value="外部YOLO数据集"></label>
+    <label>数据集目录<input name="dataset_dir" placeholder="例如 E:\datasets\tray_yolo"></label>
+    <label>数据集视野
+      <select name="image_scope" id="yolo-import-scope">
+        <option value="full_image">整图数据集</option>
+        <option value="focus_region_crop">关注区域裁剪数据集</option>
+      </select>
+    </label>
+    <label id="yolo-import-focus-wrap" class="hidden">绑定关注区域<select name="focus_region_id"></select></label>
+    <div class="button-row">
+      <button type="button" id="inspect-yolo-dataset">解析数据集</button>
+      <button class="primary" type="submit">确认导入</button>
+    </div>
+    <div class="row-meta">先解析数据集并确认标签映射。导入后会复制到训练平台 data/datasets，原始目录后续可移动或删除。</div>
+  </form>
+  <section class="panel">
+    <h2>YOLO 导入预览</h2>
+    <div id="yolo-import-summary" class="row-meta">尚未解析外部数据集。</div>
+    <div id="yolo-import-mapping" class="table-list"></div>
+  </section>
+</section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/datasets.js?v=1.2.0.0"></script>
+<script src="/static/js/datasets.js?v=1.2.1.0"></script>
 {% endblock %}

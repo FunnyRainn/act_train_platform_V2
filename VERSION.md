@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.0.1`
+`v1.2.1.0`
 
 ## Repository
 
@@ -44,6 +44,12 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.0
+
+- Adds external YOLO detection dataset import on the training dataset page.
+- Supports inspect-and-confirm label mapping before copying data into `data/datasets`.
+- Stores imported datasets as normal dataset versions with source metadata, label mapping, image-size stats, and recommended input size.
 
 ## v1.2.0.1
 
