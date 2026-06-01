@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.0.0`
+`v1.2.0.1`
 
 ## Repository
 
@@ -44,6 +44,12 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.0.1
+
+- Fix training ETA display by preferring Ultralytics `results.csv` cumulative `time` and reported `epoch`.
+- Fall back to wall-clock ETA only when CSV timing is unavailable.
+- Show no ETA for finished, stopped, failed, zero-progress, or already-complete jobs.
 
 ## v1.0.0.0 Scope
 

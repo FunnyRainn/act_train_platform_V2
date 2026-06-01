@@ -109,6 +109,40 @@ def _read_results_csv(job: dict) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     return rows, rows[-1]
 
 
+def _float_or_none(value: Any) -> float | None:
+    try:
+        if value in {None, ""}:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _current_epoch_from_results(rows: list[dict[str, Any]], last: dict[str, Any]) -> int:
+    epoch_value = _float_or_none(last.get("epoch"))
+    if epoch_value is not None and epoch_value >= 0:
+        return max(int(epoch_value), len(rows))
+    return len(rows)
+
+
+def _estimate_eta_seconds(job: dict, current: int, total: int, last: dict[str, Any]) -> int | None:
+    if job.get("status") in {"finished", "stopped", "failed"}:
+        return None
+    if current <= 0 or total <= 0 or current >= total:
+        return None
+
+    cumulative_time = _float_or_none(last.get("time"))
+    if cumulative_time is not None and cumulative_time > 0:
+        avg_epoch_seconds = cumulative_time / current
+        return int(avg_epoch_seconds * (total - current))
+
+    started = _parse_datetime(job.get("started_at"))
+    if not started:
+        return None
+    elapsed = max(1, (datetime.now() - started).total_seconds())
+    return int((elapsed / current) * (total - current))
+
+
 def _available_model_files(job: dict) -> dict[str, str]:
     weights_dir = Path(job["output_dir"]) / "train" / "weights"
     files: dict[str, str] = {}
@@ -136,13 +170,9 @@ def get_train_job_with_progress(job_id: str, auto_package: bool = True) -> dict:
     job = store.get_train_job(job_id)
     rows, last = _read_results_csv(job)
     total = int(job["params"].get("epochs") or job.get("progress", {}).get("total_epochs") or 0)
-    current = len(rows)
-    percent = round((current / total) * 100, 1) if total else 0
-    started = _parse_datetime(job.get("started_at"))
-    eta_seconds = None
-    if started and current > 0 and total and current < total:
-        elapsed = max(1, (datetime.now() - started).total_seconds())
-        eta_seconds = int((elapsed / current) * (total - current))
+    current = _current_epoch_from_results(rows, last)
+    percent = round((min(current, total) / total) * 100, 1) if total else 0
+    eta_seconds = _estimate_eta_seconds(job, current, total, last)
     model_files = _available_model_files(job)
     job["progress"] = {
         "current_epoch": current,
