@@ -22,7 +22,7 @@ def main() -> None:
         init_db()
         train_worker.run(args.train_worker)
         return
-    uvicorn.run("app:app", host=args.host, port=args.port, reload=False)
+    uvicorn.run(app, host=args.host, port=args.port, reload=False)
 
 
 if __name__ == "__main__":

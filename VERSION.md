@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.0`
+`v1.2.1.1`
 
 ## Repository
 
@@ -44,6 +44,11 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.1
+
+- Fix packaged executable startup by passing the already-created FastAPI app object to Uvicorn instead of re-importing `app:app`.
+- This keeps source-mode startup unchanged while allowing `act_train_platform.exe` to run correctly after PyInstaller packaging.
 
 ## v1.2.1.0
 
