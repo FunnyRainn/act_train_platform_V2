@@ -15,6 +15,7 @@ import yaml
 from core import store
 from core.db import json_dumps
 from core.paths import PACKAGES_DIR, PROJECT_ROOT, RUNS_DIR
+from core.runtime_paths import resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
 
 
@@ -95,7 +96,7 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 
 def _read_results_csv(job: dict) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    path = Path(job["output_dir"]) / "train" / "results.csv"
+    path = resolve_runtime_path(job["output_dir"], "训练输出目录") / "train" / "results.csv"
     if not path.exists():
         return [], {}
     rows: list[dict[str, Any]] = []
@@ -144,7 +145,7 @@ def _estimate_eta_seconds(job: dict, current: int, total: int, last: dict[str, A
 
 
 def _available_model_files(job: dict) -> dict[str, str]:
-    weights_dir = Path(job["output_dir"]) / "train" / "weights"
+    weights_dir = resolve_runtime_path(job["output_dir"], "训练输出目录") / "train" / "weights"
     files: dict[str, str] = {}
     for name in ["best.pt", "last.pt"]:
         path = weights_dir / name

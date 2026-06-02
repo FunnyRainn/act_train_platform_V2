@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.1`
+`v1.2.1.2`
 
 ## Repository
 
@@ -44,6 +44,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.2
+
+- Add runtime path resolution for packaged deployments copied to a different drive or machine.
+- Repair safely mappable platform-owned paths in SQLite and dataset metadata on startup.
+- Make training jobs resolve migrated dataset and output directories before invoking Ultralytics.
+- Update packaging guidance so deployments can live under any `act_det` directory, not a fixed drive.
 
 ## v1.2.1.1
 

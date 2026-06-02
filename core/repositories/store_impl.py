@@ -6,11 +6,12 @@ from typing import Any
 
 from core.db import get_conn, json_dumps, json_loads, row_to_dict, rows_to_dicts
 from core.paths import FRAMES_DIR
+from core.runtime_paths import resolve_runtime_path, runtime_path_exists
 from core.utils import new_id, now_text, safe_name
 
 
 def _path_exists(value: str | Path | None) -> bool:
-    return bool(value) and Path(value).exists()
+    return runtime_path_exists(value)
 
 
 def _is_under(path: Path, root: Path) -> bool:
@@ -212,7 +213,7 @@ def list_frame_sets(project_id: str | None = None) -> list[dict[str, Any]]:
         row["config"] = json_loads(row.pop("config_json"), {})
     valid_rows = []
     for row in rows:
-        output_dir = Path(row["output_dir"])
+        output_dir = resolve_runtime_path(row["output_dir"], "帧集目录")
         has_existing_frame = any(_path_exists(frame.get("path")) for frame in frame_rows.get(row["id"], []))
         if output_dir.exists() and has_existing_frame:
             valid_rows.append(row)
@@ -391,7 +392,7 @@ def delete_focus_region(region_id: str) -> dict[str, Any]:
 
 def delete_frame_set(frame_set_id: str) -> dict[str, Any]:
     frame_set = get_frame_set(frame_set_id)
-    output_dir = Path(frame_set["output_dir"])
+    output_dir = resolve_runtime_path(frame_set["output_dir"], "帧集目录")
     if output_dir.exists():
         if not _is_under(output_dir, FRAMES_DIR):
             raise ValueError(f"帧集目录不在平台抽帧目录内，拒绝删除: {output_dir}")

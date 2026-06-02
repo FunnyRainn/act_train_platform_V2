@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from core import store
+from core.runtime_paths import resolve_runtime_path
 from core.utils import new_id
 
 
@@ -23,7 +22,8 @@ def run_prelabel(frame_set_id: str, model_path: str, conf: float = 0.25) -> dict
     frames = store.list_frames(frame_set_id)
     created = 0
     for frame in frames:
-        result = model.predict(source=str(Path(frame["path"])), conf=conf, verbose=False)[0]
+        frame_path = resolve_runtime_path(frame["path"], "帧图片", require_exists=True)
+        result = model.predict(source=str(frame_path), conf=conf, verbose=False)[0]
         annotations = []
         height = float(result.orig_shape[0])
         width = float(result.orig_shape[1])

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 
 from core import store, training_ops
+from core.runtime_paths import resolve_runtime_path
 from web.context import api_error
 
 router = APIRouter()
@@ -29,9 +29,7 @@ async def create_model_package(request: Request) -> dict:
 def open_model_package_folder(package_id: str) -> dict:
     try:
         package = store.get_model_package(package_id)
-        package_dir = Path(package["package_dir"])
-        if not package_dir.exists():
-            raise FileNotFoundError("模型目录不存在，可能已被移动或删除")
+        package_dir = resolve_runtime_path(package["package_dir"], "模型目录", require_exists=True)
         subprocess.Popen(["explorer.exe", str(package_dir)])
         return {"package_id": package_id, "opened": True, "package_dir": str(package_dir)}
     except Exception as exc:

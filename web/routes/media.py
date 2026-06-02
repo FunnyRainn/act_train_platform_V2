@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse
 
 from core import store, video_ops
+from core.runtime_paths import resolve_runtime_path
 from web.context import api_error
 
 router = APIRouter()
@@ -105,9 +104,7 @@ def list_frames(frame_set_id: str) -> list[dict]:
 def frame_image(frame_id: str) -> FileResponse:
     try:
         frame = store.get_frame(frame_id)
-        path = Path(frame["path"])
-        if not path.exists():
-            raise FileNotFoundError(path)
+        path = resolve_runtime_path(frame["path"], "帧图片", require_exists=True)
         return FileResponse(path)
     except Exception as exc:
         raise api_error(exc)

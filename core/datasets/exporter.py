@@ -10,6 +10,7 @@ import yaml
 
 from core import store
 from core.paths import DATASETS_DIR
+from core.runtime_paths import resolve_runtime_path
 from core.utils import clean_dir, new_id, split_by_ratio, unique_keep_order
 
 
@@ -130,7 +131,7 @@ def _finish_size_stats(stats: dict) -> dict:
 
 
 def _require_history_structure(dataset: dict) -> Path:
-    output_dir = Path(dataset["output_dir"])
+    output_dir = resolve_runtime_path(dataset["output_dir"], "历史训练数据集目录", require_exists=True)
     if not output_dir.exists():
         raise FileNotFoundError(f"历史训练数据集目录不存在: {output_dir}")
     for root_name in ["images", "labels"]:
@@ -341,7 +342,7 @@ def _export_one_dataset(
         if not anns:
             counts["skipped_unannotated"] += 1
             continue
-        src = Path(frame["path"])
+        src = resolve_runtime_path(frame["path"], "帧图片", require_exists=True)
         if not src.exists():
             counts["skipped_unannotated"] += 1
             continue

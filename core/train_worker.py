@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import sys
 import traceback
-from pathlib import Path
 
 from ultralytics import YOLO
 
 from . import store
 from .db import json_dumps
+from .runtime_paths import resolve_runtime_path
 from .utils import now_text
 
 
@@ -16,11 +16,22 @@ def run(job_id: str) -> None:
         job = store.get_train_job(job_id)
         dataset = store.get_dataset_version(job["dataset_version_id"])
         store.update_train_job(job_id, status="running", started_at=now_text(), log_text="模型训练已启动。")
-        data_yaml = Path(dataset["output_dir"]) / "dataset.generated.yaml"
+
+        dataset_dir = resolve_runtime_path(dataset["output_dir"], "训练数据集目录", require_exists=True)
+        data_yaml = dataset_dir / "dataset.generated.yaml"
+        if not data_yaml.exists():
+            raise FileNotFoundError(
+                "训练数据集配置不存在，请确认已复制 act_train_platform\\data\\datasets。"
+                f" 原始目录={dataset['output_dir']}; 当前解析目录={dataset_dir}; 配置文件={data_yaml}"
+            )
+
+        output_dir = resolve_runtime_path(job["output_dir"], "训练输出目录", require_exists=False)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         params = job["params"]
         train_kwargs = {
             "data": str(data_yaml),
-            "project": str(Path(job["output_dir"])),
+            "project": str(output_dir),
             "name": "train",
             "exist_ok": True,
             "epochs": int(params.get("epochs") or 50),

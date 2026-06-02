@@ -6,6 +6,7 @@ import cv2
 
 from core import store
 from core.paths import ASSETS_DIR, FRAMES_DIR, UPLOADS_DIR
+from core.runtime_paths import resolve_runtime_path
 from core.utils import copy_file, new_id, safe_name
 
 
@@ -30,7 +31,7 @@ def probe_video(path: Path) -> dict:
 
 def _create_product_video_from_asset(project_id: str, asset: dict) -> dict:
     video_id = new_id("video")
-    src = Path(asset["stored_path"])
+    src = resolve_runtime_path(asset["stored_path"], "素材视频", require_exists=True)
     dst = UPLOADS_DIR / project_id / f"{video_id}_{safe_name(src.stem)}{src.suffix}"
     copy_file(src, dst)
     return store.create_video(
@@ -111,7 +112,7 @@ def extract_frames(
             raise ValueError(f"帧集名称已存在: {frame_set_name}")
         store.delete_frame_set(existing["id"])
 
-    video_path = Path(video["path"])
+    video_path = resolve_runtime_path(video["path"], "产品视频", require_exists=True)
     frame_set_id = new_id("frameset")
     output_dir = FRAMES_DIR / video["project_id"] / frame_set_id
     output_dir.mkdir(parents=True, exist_ok=True)
