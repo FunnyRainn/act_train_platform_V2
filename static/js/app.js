@@ -88,7 +88,7 @@ function rowHtml(title, meta, action = "") {
 }
 
 function secondsText(seconds) {
-  if (seconds === null || seconds === undefined) return "估算中";
+  if (seconds === null || seconds === undefined) return "-";
   const s = Math.max(0, Number(seconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);

@@ -16,22 +16,31 @@ def _normalise_text_path(value: str) -> str:
     return value.replace("\\", "/")
 
 
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except Exception:
+        return False
+
+
 def map_to_current_data_root(value: str | Path | None) -> Path | None:
     """Map a stored platform data path to this installation's data root.
 
-    The platform used to persist absolute paths. After a packaged deployment is
-    copied to another machine or drive, those paths can point back to the
-    development machine. If the stored path contains the platform data marker,
-    keep the part after ``act_train_platform/data`` and resolve it under the
-    current runtime DATA_ROOT.
+    Older records persisted absolute paths. After copying a packaged deployment
+    to another machine or drive, those paths can point back to the development
+    machine. If a stored path belongs to ``act_train_platform/data``, keep the
+    suffix after that marker and resolve it under the current runtime
+    ``DATA_ROOT``.
+
+    If both the old path and the current package path exist, prefer the current
+    package path. This prevents local package smoke tests from accidentally
+    reading the source project's data.
     """
     if value in {None, ""}:
         return None
     raw = str(value)
     path = Path(raw)
-    if path.exists():
-        return path
-
     normalised = _normalise_text_path(raw)
     lowered = normalised.lower()
     marker_index = lowered.find(_DATA_MARKER)
@@ -39,9 +48,13 @@ def map_to_current_data_root(value: str | Path | None) -> Path | None:
         return path
 
     relative_part = normalised[marker_index + len(_DATA_MARKER) :].lstrip("/")
-    if not relative_part:
-        return DATA_ROOT
-    return DATA_ROOT / Path(*relative_part.split("/"))
+    mapped = DATA_ROOT if not relative_part else DATA_ROOT / Path(*relative_part.split("/"))
+
+    if mapped.exists() and not _is_under(path, DATA_ROOT):
+        return mapped
+    if path.exists():
+        return path
+    return mapped
 
 
 def resolve_runtime_path(value: str | Path | None, label: str = "数据路径", require_exists: bool = False) -> Path:
@@ -49,7 +62,7 @@ def resolve_runtime_path(value: str | Path | None, label: str = "数据路径", 
     if mapped is None:
         raise FileNotFoundError(f"{label}为空")
     if require_exists and not mapped.exists():
-        raise FileNotFoundError(f"{label}不存在: 原始路径={value}; 当前机器解析路径={mapped}")
+        raise FileNotFoundError(f"{label}不存在。原始路径={value}; 当前机器解析路径={mapped}")
     return mapped
 
 
@@ -61,8 +74,8 @@ def runtime_path_exists(value: str | Path | None) -> bool:
 def repair_runtime_paths_in_db(conn) -> dict[str, int]:
     """Repair safely mappable platform-owned paths in SQLite.
 
-    Only paths that currently do not exist and whose mapped target under the
-    current DATA_ROOT exists are updated. External import paths are left alone.
+    Only paths whose target under the current ``DATA_ROOT`` exists are updated.
+    External import paths are left alone.
     """
     repaired: dict[str, int] = {}
     targets: Iterable[tuple[str, str]] = [
@@ -83,10 +96,7 @@ def repair_runtime_paths_in_db(conn) -> dict[str, int]:
         for row in rows:
             original = row[column]
             mapped = map_to_current_data_root(original)
-            if mapped is None:
-                continue
-            original_path = Path(str(original))
-            if original_path.exists() or not mapped.exists() or str(mapped) == str(original):
+            if mapped is None or not mapped.exists() or str(mapped) == str(original):
                 continue
             conn.execute(f"UPDATE {table} SET {column}=? WHERE id=?", (str(mapped), row["id"]))
             count += 1
@@ -121,19 +131,16 @@ def repair_dataset_metadata_files() -> dict[str, int]:
             text = json_path.read_text(encoding="utf-8")
         except Exception:
             continue
-        normalised = _normalise_text_path(text)
-        lowered = normalised.lower()
-        marker_index = lowered.find(_DATA_MARKER)
-        if marker_index < 0:
+        if _DATA_MARKER not in _normalise_text_path(text).lower():
             continue
         try:
             data = json.loads(text)
         except Exception:
             continue
-        new_text = _replace_platform_data_paths(data)
-        if new_text is None:
+        new_data = _replace_platform_data_paths(data)
+        if new_data is None:
             continue
-        json_path.write_text(json.dumps(new_text, ensure_ascii=False, indent=2), encoding="utf-8")
+        json_path.write_text(json.dumps(new_data, ensure_ascii=False, indent=2), encoding="utf-8")
         repaired["json"] += 1
     return repaired
 

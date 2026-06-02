@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import multiprocessing
 
 import uvicorn
 
@@ -26,4 +27,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     main()

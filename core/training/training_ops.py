@@ -19,6 +19,9 @@ from core.runtime_paths import resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
 
 
+WORKER_LOG_NAME = "worker.log"
+
+
 def create_train_job(project_id: str, dataset_version_id: str, name: str, base_model_path: str, params: dict[str, Any]) -> dict:
     dataset = store.get_dataset_version(dataset_version_id)
     params = dict(params or {})
@@ -32,10 +35,11 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
         params["imgsz"] = int(raw_imgsz)
         params["auto_imgsz"] = False
     params["recommended_imgsz"] = recommended_imgsz
+
     job_id = new_id("train")
     output_dir = RUNS_DIR / project_id / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
-    job = store.save_train_job(
+    store.save_train_job(
         {
             "id": job_id,
             "project_id": project_id,
@@ -48,20 +52,27 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
             "progress": {"current_epoch": 0, "total_epochs": int(params.get("epochs") or 50), "percent": 0},
         }
     )
+
     env = os.environ.copy()
     env.setdefault("PYTHONIOENCODING", "utf-8")
     if getattr(sys, "frozen", False):
         worker_command = [sys.executable, "--train-worker", job_id]
     else:
         worker_command = [sys.executable, "-m", "core.train_worker", job_id]
-    process = subprocess.Popen(
-        worker_command,
-        cwd=str(PROJECT_ROOT),
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
-    )
+
+    worker_log_path = output_dir / WORKER_LOG_NAME
+    log_handle = worker_log_path.open("a", encoding="utf-8", buffering=1)
+    try:
+        process = subprocess.Popen(
+            worker_command,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
+        )
+    finally:
+        log_handle.close()
     store.update_train_job(job_id, process_id=process.pid)
     return get_train_job_with_progress(job_id)
 
@@ -154,6 +165,18 @@ def _available_model_files(job: dict) -> dict[str, str]:
     return files
 
 
+def _worker_log_tail(job: dict, max_chars: int = 4000) -> str:
+    try:
+        output_dir = resolve_runtime_path(job["output_dir"], "训练输出目录")
+        log_path = output_dir / WORKER_LOG_NAME
+        if not log_path.exists():
+            return ""
+        data = log_path.read_text(encoding="utf-8", errors="ignore")
+        return data[-max_chars:].strip()
+    except Exception:
+        return ""
+
+
 def _existing_package_for_job(train_job_id: str) -> dict[str, Any] | None:
     for package in store.list_model_packages():
         if package.get("train_job_id") == train_job_id:
@@ -183,6 +206,7 @@ def get_train_job_with_progress(job_id: str, auto_package: bool = True) -> dict:
         "last_metrics": last,
         "series": rows[-200:],
         "model_files": model_files,
+        "worker_log_tail": _worker_log_tail(job),
     }
     if auto_package and job.get("status") in {"finished", "stopped"} and model_files:
         try:
@@ -274,12 +298,12 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
         "default_weight": default_weight,
         "label_codes": dataset["label_codes"],
         "labels": label_rows,
-        "image_scope": (dataset.get("metadata") or {}).get("image_scope", "full_image"),
+        "image_scope": dataset_metadata.get("image_scope", "full_image"),
         "focus_region": {
-            "id": (dataset.get("metadata") or {}).get("focus_region_id"),
-            "name": (dataset.get("metadata") or {}).get("focus_region_name"),
-            "rect_norm": (dataset.get("metadata") or {}).get("focus_region_rect_norm"),
-        } if (dataset.get("metadata") or {}).get("focus_region_id") else None,
+            "id": dataset_metadata.get("focus_region_id"),
+            "name": dataset_metadata.get("focus_region_name"),
+            "rect_norm": dataset_metadata.get("focus_region_rect_norm"),
+        } if dataset_metadata.get("focus_region_id") else None,
         "source_product": {"id": project["id"], "name": project["name"], "product_name": project.get("product_name", "")},
         "train_job_id": train_job_id,
         "dataset_version_id": dataset["id"],

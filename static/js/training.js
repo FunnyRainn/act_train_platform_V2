@@ -113,6 +113,15 @@ function statusText(status) {
   return map[status] || status || "-";
 }
 
+function jobLogText(job) {
+  const tail = job.progress?.worker_log_tail || "";
+  const base = job.log_text || "";
+  if (tail && !base.includes(tail)) {
+    return `${base}\n${tail}`.trim();
+  }
+  return base;
+}
+
 async function refreshTraining() {
   const state = captureTrainFormState();
   const data = await loadBootstrap();
@@ -124,7 +133,7 @@ async function refreshTraining() {
     const modelPackage = job.model_package;
     const hasModel = modelPackage || (p.model_files && Object.keys(p.model_files).length > 0);
     const packageText = modelPackage
-      ? `模型目录已生成: ${esc(modelPackage.package_dir)}`
+      ? `模型目录已生成：${esc(modelPackage.package_dir)}`
       : hasModel
         ? "检测到模型文件，正在整理到模型仓库"
         : "尚未产生可用模型";
@@ -136,7 +145,7 @@ async function refreshTraining() {
         <div class="row-meta">${packageText}</div>
         <div class="chart-legend">${SERIES_DEFS.map(def => `<span><i style="background:${def.color}"></i>${def.label}</span>`).join("")}</div>
         <canvas class="chart" data-job="${esc(job.id)}"></canvas>
-        <div class="row-meta">${esc(job.log_text || "")}</div>
+        <pre class="row-meta train-log">${esc(jobLogText(job))}</pre>
       `,
       `
         ${canStop ? `<button data-stop="${esc(job.id)}">停止</button>` : ""}
@@ -191,7 +200,7 @@ $("#train-form").addEventListener("submit", async event => {
   }
 });
 
-$("#train-form select[name=dataset_version_id]").addEventListener("change", async event => {
+$("#train-form select[name=dataset_version_id]").addEventListener("change", async () => {
   try {
     const data = await loadBootstrap();
     updateImgSizeRecommendation(data.datasets);

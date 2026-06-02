@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.2`
+`v1.2.1.3`
 
 ## Repository
 
@@ -44,6 +44,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.3
+
+- Fix packaged training jobs that can appear stuck before the first epoch on Windows by using in-process data loading by default for training workers.
+- Capture training worker stdout/stderr into `worker.log` and surface the tail in the training task list for diagnosis.
+- Prefer the packaged installation's own `data` directory for platform-owned paths, even when the old development path still exists on the same machine.
+- Fix customer-visible mojibake on the training page and training-related runtime error messages.
 
 ## v1.2.1.2
 

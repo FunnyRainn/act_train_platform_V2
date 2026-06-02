@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 
@@ -9,6 +10,17 @@ from . import store
 from .db import json_dumps
 from .runtime_paths import resolve_runtime_path
 from .utils import now_text
+
+
+def _worker_count(params: dict) -> int:
+    raw = params.get("workers")
+    if raw not in {None, "", "auto"}:
+        return max(0, int(raw))
+    # Packaged Windows executables are more reliable with in-process data
+    # loading. It avoids PyInstaller/DataLoader child-process startup hangs.
+    if os.name == "nt" or getattr(sys, "frozen", False):
+        return 0
+    return 4
 
 
 def run(job_id: str) -> None:
@@ -38,12 +50,13 @@ def run(job_id: str) -> None:
             "imgsz": int(params.get("imgsz") or 1280),
             "batch": int(params.get("batch") or 8),
             "device": str(params.get("device") or "0"),
-            "workers": int(params.get("workers") or 4),
+            "workers": _worker_count(params),
             "patience": int(params.get("patience") or 30),
             "plots": True,
             "val": True,
             "save": True,
         }
+        print(f"训练参数: {train_kwargs}", flush=True)
         model = YOLO(job["base_model_path"])
         result = model.train(**train_kwargs)
         store.update_train_job(
@@ -62,6 +75,8 @@ def run(job_id: str) -> None:
             log_text=f"{exc}\n{traceback.format_exc()}",
             process_id=0,
         )
+        print(f"训练失败: {exc}", flush=True)
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
