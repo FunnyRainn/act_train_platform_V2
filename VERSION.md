@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.3`
+`v1.2.1.4`
 
 ## Repository
 
@@ -44,6 +44,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.4
+
+- Hides the internal base model path from the training page and uses the system default base model on the backend.
+- Replaces the customer-visible worker log console with business training phases such as preparation, model loading, dataset checking, and training.
+- Keeps detailed worker diagnostics in `worker.log` for operations use without showing raw logs on the customer page.
+- Cleans training-related mojibake in the training page, training script, training worker, and common helper text.
 
 ## v1.2.1.3
 

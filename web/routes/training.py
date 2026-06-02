@@ -7,6 +7,8 @@ from web.context import api_error
 
 router = APIRouter()
 
+DEFAULT_BASE_MODEL = "yolo11m.pt"
+
 
 @router.get("/api/train-jobs")
 def list_train_jobs(project_id: str | None = None) -> list[dict]:
@@ -21,7 +23,7 @@ async def create_train_job(request: Request) -> dict:
             payload["project_id"],
             payload["dataset_version_id"],
             payload.get("name") or "模型训练任务",
-            payload.get("base_model_path") or "yolo11m.pt",
+            payload.get("base_model_path") or DEFAULT_BASE_MODEL,
             payload.get("params") or {},
         )
     except Exception as exc:

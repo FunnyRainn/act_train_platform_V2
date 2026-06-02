@@ -13,7 +13,6 @@ from typing import Any
 import yaml
 
 from core import store
-from core.db import json_dumps
 from core.paths import PACKAGES_DIR, PROJECT_ROOT, RUNS_DIR
 from core.runtime_paths import resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
@@ -165,16 +164,36 @@ def _available_model_files(job: dict) -> dict[str, str]:
     return files
 
 
-def _worker_log_tail(job: dict, max_chars: int = 4000) -> str:
+def _worker_log_exists(job: dict) -> bool:
     try:
         output_dir = resolve_runtime_path(job["output_dir"], "训练输出目录")
         log_path = output_dir / WORKER_LOG_NAME
-        if not log_path.exists():
-            return ""
-        data = log_path.read_text(encoding="utf-8", errors="ignore")
-        return data[-max_chars:].strip()
+        return log_path.exists() and log_path.stat().st_size > 0
     except Exception:
-        return ""
+        return False
+
+
+def _phase_text(job: dict, current_epoch: int) -> str:
+    status = job.get("status")
+    if status == "queued":
+        return "训练准备中"
+    if status == "running":
+        if current_epoch > 0:
+            return "训练中"
+        started = _parse_datetime(job.get("started_at"))
+        elapsed = (datetime.now() - started).total_seconds() if started else 0
+        if elapsed > 120:
+            return "训练初始化较慢，请稍候"
+        if _worker_log_exists(job):
+            return "正在加载模型/检查数据集"
+        return "训练准备中"
+    if status == "finished":
+        return "已完成"
+    if status == "stopped":
+        return "已停止"
+    if status == "failed":
+        return "失败"
+    return "等待中"
 
 
 def _existing_package_for_job(train_job_id: str) -> dict[str, Any] | None:
@@ -206,7 +225,7 @@ def get_train_job_with_progress(job_id: str, auto_package: bool = True) -> dict:
         "last_metrics": last,
         "series": rows[-200:],
         "model_files": model_files,
-        "worker_log_tail": _worker_log_tail(job),
+        "phase_text": _phase_text(job, current),
     }
     if auto_package and job.get("status") in {"finished", "stopped"} and model_files:
         try:

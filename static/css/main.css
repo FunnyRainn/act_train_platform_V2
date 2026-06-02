@@ -303,17 +303,6 @@ label.inline input {
   word-break: break-all;
 }
 
-.train-log {
-  max-height: 180px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--panel) 88%, var(--bg));
-}
-
 .steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

@@ -48,7 +48,6 @@ function captureTrainFormState() {
     project_id: form.project_id.value,
     dataset_version_id: form.dataset_version_id.value,
     name: form.name.value,
-    base_model_path: form.base_model_path.value,
     epochs: form.epochs.value,
     imgsz: form.imgsz.value,
     batch: form.batch.value,
@@ -113,13 +112,15 @@ function statusText(status) {
   return map[status] || status || "-";
 }
 
-function jobLogText(job) {
-  const tail = job.progress?.worker_log_tail || "";
-  const base = job.log_text || "";
-  if (tail && !base.includes(tail)) {
-    return `${base}\n${tail}`.trim();
+function phaseText(job) {
+  return job.progress?.phase_text || statusText(job.status);
+}
+
+function supportText(job) {
+  if (job.status === "running" && Number(job.progress?.current_epoch || 0) === 0) {
+    return "训练初始化阶段可能需要加载模型、检查数据集和初始化显卡，请稍候。";
   }
-  return base;
+  return "";
 }
 
 async function refreshTraining() {
@@ -137,15 +138,16 @@ async function refreshTraining() {
       : hasModel
         ? "检测到模型文件，正在整理到模型仓库"
         : "尚未产生可用模型";
+    const hint = supportText(job);
     return rowHtml(
       esc(job.name),
       `
-        状态: ${esc(statusText(job.status))} | 进度: ${p.current_epoch || 0}/${p.total_epochs || "-"} | 预计剩余: ${secondsText(p.eta_seconds)}
+        状态: ${esc(statusText(job.status))} | 阶段: ${esc(phaseText(job))} | 进度: ${p.current_epoch || 0}/${p.total_epochs || "-"} | 预计剩余: ${secondsText(p.eta_seconds)}
         <div class="progress-shell"><div class="progress-fill" style="width:${Number(p.percent || 0)}%"></div></div>
         <div class="row-meta">${packageText}</div>
+        ${hint ? `<div class="row-meta">${esc(hint)}</div>` : ""}
         <div class="chart-legend">${SERIES_DEFS.map(def => `<span><i style="background:${def.color}"></i>${def.label}</span>`).join("")}</div>
         <canvas class="chart" data-job="${esc(job.id)}"></canvas>
-        <pre class="row-meta train-log">${esc(jobLogText(job))}</pre>
       `,
       `
         ${canStop ? `<button data-stop="${esc(job.id)}">停止</button>` : ""}
@@ -185,7 +187,6 @@ $("#train-form").addEventListener("submit", async event => {
       project_id: form.project_id.value,
       dataset_version_id: form.dataset_version_id.value,
       name: form.name.value,
-      base_model_path: form.base_model_path.value,
       params: {
         epochs: Number(form.epochs.value),
         imgsz: form.imgsz.value ? Number(form.imgsz.value) : null,
