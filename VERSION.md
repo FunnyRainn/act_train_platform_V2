@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.5`
+`v1.2.1.6`
 
 ## Repository
 
@@ -44,6 +44,11 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.6
+
+- Adds front-end validation for video upload and server-path import so missing product, missing file, or missing path are shown as clear customer-facing prompts instead of FastAPI 422 errors.
+- Keeps the backend upload/import API unchanged; this is a low-risk page interaction fix after packaged deployment verification.
 
 ## v1.2.1.5
 

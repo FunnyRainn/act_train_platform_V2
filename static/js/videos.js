@@ -104,6 +104,16 @@ $("#upload-form").addEventListener("submit", async event => {
   event.preventDefault();
   const form = event.currentTarget;
   syncProjectSelects();
+  const projectId = form.querySelector("select[name=project_id]")?.value;
+  const fileInput = form.querySelector("input[name=file]");
+  if (!projectId) {
+    showToast("请先选择产品", "error");
+    return;
+  }
+  if (!fileInput?.files?.length) {
+    showToast("请先选择要上传的视频文件", "error");
+    return;
+  }
   const body = new FormData(form);
   try {
     const res = await fetch("/api/videos/upload", { method: "POST", body });
@@ -120,6 +130,16 @@ $("#import-form").addEventListener("submit", async event => {
   event.preventDefault();
   const form = event.currentTarget;
   syncProjectSelects();
+  const projectId = form.querySelector("select[name=project_id]")?.value;
+  const path = form.querySelector("input[name=path]")?.value.trim();
+  if (!projectId) {
+    showToast("请先选择产品", "error");
+    return;
+  }
+  if (!path) {
+    showToast("请填写服务器本地视频路径", "error");
+    return;
+  }
   try {
     await apiPost("/api/videos/import", formToObject(form));
     showToast("视频已导入素材库并复制到当前产品");
