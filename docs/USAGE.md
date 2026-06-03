@@ -5,7 +5,7 @@
 第一版直接使用已经具备训练依赖的 conda 环境运行。当前本机验证可用环境为：
 
 ```text
-D:\soft\29anaconda3\anaconda3\envs\act_server_py310\python.exe
+conda activate act_server_py310
 ```
 
 如果后续你确认 `train_act_det_yolo` 使用的是另一个训练环境，则把下面命令中的 Python 路径替换成该环境的 `python.exe`。
@@ -13,8 +13,9 @@ D:\soft\29anaconda3\anaconda3\envs\act_server_py310\python.exe
 启动命令：
 
 ```powershell
-cd "D:\soft\99 AllWorkSpace\action_detection\act_train_platform"
-D:\soft\29anaconda3\anaconda3\envs\act_server_py310\python.exe app.py --host 0.0.0.0 --port 18100
+cd act_train_platform
+conda activate act_server_py310
+python app.py --host 0.0.0.0 --port 18100
 ```
 
 访问：

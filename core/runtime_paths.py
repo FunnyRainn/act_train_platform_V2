@@ -33,9 +33,9 @@ def map_to_current_data_root(value: str | Path | None) -> Path | None:
     suffix after that marker and resolve it under the current runtime
     ``DATA_ROOT``.
 
-    If both the old path and the current package path exist, prefer the current
-    package path. This prevents local package smoke tests from accidentally
-    reading the source project's data.
+    If the stored path belongs to another installation's data directory, always
+    prefer this installation's mapped path. This prevents copied source mirrors
+    from accidentally reading files that still exist on the development machine.
     """
     if value in {None, ""}:
         return None
@@ -50,7 +50,7 @@ def map_to_current_data_root(value: str | Path | None) -> Path | None:
     relative_part = normalised[marker_index + len(_DATA_MARKER) :].lstrip("/")
     mapped = DATA_ROOT if not relative_part else DATA_ROOT / Path(*relative_part.split("/"))
 
-    if mapped.exists() and not _is_under(path, DATA_ROOT):
+    if not _is_under(path, DATA_ROOT):
         return mapped
     if path.exists():
         return path

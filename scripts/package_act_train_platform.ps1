@@ -1,10 +1,17 @@
 $ErrorActionPreference = "Stop"
 
-$PythonExe = "D:\soft\29anaconda3\anaconda3\envs\act_server_py310\python.exe"
 $PackageName = "act_train_platform"
 
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptRoot
+$PythonExe = $env:ACT_TRAIN_PLATFORM_PYTHON
+if (-not $PythonExe) {
+    $PythonExe = "python"
+}
+$PythonCommand = Get-Command $PythonExe -ErrorAction SilentlyContinue
+if ($PythonCommand) {
+    $PythonExe = $PythonCommand.Source
+}
 $CondaEnvRoot = Split-Path -Parent $PythonExe
 $CondaLibraryBin = Join-Path $CondaEnvRoot "Library\bin"
 $BuildRoot = Join-Path $ProjectRoot "build"
@@ -23,11 +30,8 @@ function Assert-UnderProject([string]$PathValue) {
     }
 }
 
-if (-not (Test-Path -LiteralPath $PythonExe)) {
-    throw "Python environment not found: $PythonExe"
-}
 if (-not (Test-Path -LiteralPath $CondaLibraryBin)) {
-    throw "Conda Library bin not found: $CondaLibraryBin"
+    throw "Conda Library bin not found: $CondaLibraryBin. Set ACT_TRAIN_PLATFORM_PYTHON to the target environment python.exe when packaging."
 }
 
 Push-Location $ProjectRoot

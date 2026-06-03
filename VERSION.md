@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.6`
+`v1.2.1.7`
 
 ## Repository
 
@@ -44,6 +44,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.7
+
+- Adds a project-local source startup script that uses `conda activate act_server_py310` without hard-coded Anaconda install paths.
+- Parameterizes packaging Python selection through `ACT_TRAIN_PLATFORM_PYTHON`.
+- Keeps the existing SQLite database and runtime path migration behavior; deployments should carry the database and tolerate missing historical media/data files with clear page/API errors.
+- Prevents copied deployments from reading stale files that still exist under another machine's old `act_train_platform/data` path.
 
 ## v1.2.1.6
 
