@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from .paths import DB_PATH, ensure_runtime_dirs
-from .runtime_paths import repair_dataset_metadata_files, repair_runtime_paths_in_db
+from .runtime_paths import repair_runtime_paths_in_db
 
 
 def connect() -> sqlite3.Connection:
@@ -58,7 +58,6 @@ def init_db() -> None:
         conn.executescript(schema_path.read_text(encoding="utf-8"))
         _migrate(conn)
         repair_runtime_paths_in_db(conn)
-    repair_dataset_metadata_files()
 
 
 def _has_column(conn: sqlite3.Connection, table: str, column: str) -> bool:

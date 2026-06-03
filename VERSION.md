@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.4`
+`v1.2.1.5`
 
 ## Repository
 
@@ -44,6 +44,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.1.5
+
+- Stops scanning every dataset/model JSON file at startup for path repair, avoiding slow or stuck startup when the training data directory is large.
+- Keeps lightweight SQLite path repair on startup and moves dataset YAML/JSON path repair to on-demand use by training and model-package export.
+- Adds a temporary-data-root smoke check covering project creation, video upload, frame extraction, annotation save, and dataset export without touching production data.
+- Keeps upload, frame extraction, and dataset export behavior aligned with the pre-governance implementation while preserving portable runtime path resolution.
 
 ## v1.2.1.4
 

@@ -8,7 +8,7 @@ from ultralytics import YOLO
 
 from . import store
 from .db import json_dumps
-from .runtime_paths import resolve_runtime_path
+from .runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from .utils import now_text
 
 
@@ -30,6 +30,7 @@ def run(job_id: str) -> None:
         store.update_train_job(job_id, status="running", started_at=now_text(), log_text="模型训练已启动。")
 
         dataset_dir = resolve_runtime_path(dataset["output_dir"], "训练数据集目录", require_exists=True)
+        repair_dataset_artifacts(dataset_dir)
         data_yaml = dataset_dir / "dataset.generated.yaml"
         if not data_yaml.exists():
             raise FileNotFoundError(

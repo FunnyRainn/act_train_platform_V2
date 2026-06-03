@@ -82,7 +82,6 @@ def repair_runtime_paths_in_db(conn) -> dict[str, int]:
         ("video_assets", "stored_path"),
         ("videos", "path"),
         ("frame_sets", "output_dir"),
-        ("frames", "path"),
         ("dataset_versions", "output_dir"),
         ("train_jobs", "output_dir"),
         ("model_packages", "package_dir"),
@@ -105,44 +104,47 @@ def repair_runtime_paths_in_db(conn) -> dict[str, int]:
     return repaired
 
 
-def repair_dataset_metadata_files() -> dict[str, int]:
+def repair_dataset_artifacts(dataset_dir: str | Path) -> dict[str, int]:
+    """Repair path metadata for one dataset directory on demand."""
     repaired = {"dataset_yaml": 0, "json": 0}
-    if not DATA_ROOT.exists():
-        return repaired
+    root = resolve_runtime_path(dataset_dir, "训练数据集目录", require_exists=True)
 
-    for yaml_path in DATA_ROOT.glob("datasets/**/dataset.generated.yaml"):
+    yaml_path = root / "dataset.generated.yaml"
+    if yaml_path.exists():
         try:
             data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+            mapped = map_to_current_data_root(data.get("path"))
+            if mapped is not None and mapped.exists() and str(mapped) != str(data.get("path")):
+                data["path"] = str(mapped)
+                yaml_path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+                repaired["dataset_yaml"] += 1
         except Exception:
-            continue
-        mapped = map_to_current_data_root(data.get("path"))
-        if mapped is None or str(mapped) == str(data.get("path")):
-            continue
-        if not mapped.exists():
-            continue
-        data["path"] = str(mapped)
-        yaml_path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
-        repaired["dataset_yaml"] += 1
+            pass
 
-    for json_path in DATA_ROOT.glob("**/*.json"):
-        if json_path.name not in {"dataset_version.json", "model_manifest.json", "train_report.json"}:
-            continue
-        try:
-            text = json_path.read_text(encoding="utf-8")
-        except Exception:
-            continue
-        if _DATA_MARKER not in _normalise_text_path(text).lower():
-            continue
-        try:
-            data = json.loads(text)
-        except Exception:
-            continue
-        new_data = _replace_platform_data_paths(data)
-        if new_data is None:
-            continue
-        json_path.write_text(json.dumps(new_data, ensure_ascii=False, indent=2), encoding="utf-8")
-        repaired["json"] += 1
+    json_path = root / "dataset_version.json"
+    if json_path.exists():
+        repaired["json"] += repair_json_metadata_file(json_path)
     return repaired
+
+
+def repair_json_metadata_file(json_path: str | Path) -> int:
+    """Repair platform-owned paths in a single JSON metadata file."""
+    path = Path(json_path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return 0
+    if _DATA_MARKER not in _normalise_text_path(text).lower():
+        return 0
+    try:
+        data = json.loads(text)
+    except Exception:
+        return 0
+    new_data = _replace_platform_data_paths(data)
+    if new_data == data:
+        return 0
+    path.write_text(json.dumps(new_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return 1
 
 
 def _replace_platform_data_paths(value):

@@ -14,7 +14,7 @@ import yaml
 
 from core import store
 from core.paths import PACKAGES_DIR, PROJECT_ROOT, RUNS_DIR
-from core.runtime_paths import resolve_runtime_path
+from core.runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
 
 
@@ -23,6 +23,7 @@ WORKER_LOG_NAME = "worker.log"
 
 def create_train_job(project_id: str, dataset_version_id: str, name: str, base_model_path: str, params: dict[str, Any]) -> dict:
     dataset = store.get_dataset_version(dataset_version_id)
+    repair_dataset_artifacts(dataset["output_dir"])
     params = dict(params or {})
     dataset_metadata = dataset.get("metadata") or {}
     recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or (dataset.get("summary") or {}).get("recommended_imgsz") or 1280)
@@ -292,6 +293,7 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
     if not selected:
         raise FileNotFoundError("当前训练任务没有可用模型文件，不能生成模型目录。")
     dataset = store.get_dataset_version(job["dataset_version_id"])
+    repair_dataset_artifacts(dataset["output_dir"])
     project = store.get_project(job["project_id"])
     package_id = new_id("package")
     package_dir = PACKAGES_DIR / project["id"] / f"{package_id}_{safe_name(name)}"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import os
 from pathlib import Path
 
 
@@ -8,7 +9,7 @@ if getattr(sys, "frozen", False):
     PROJECT_ROOT = Path(sys.executable).resolve().parent
 else:
     PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_ROOT = PROJECT_ROOT / "data"
+DATA_ROOT = Path(os.environ.get("ACT_TRAIN_DATA_ROOT") or (PROJECT_ROOT / "data")).resolve()
 ASSETS_DIR = DATA_ROOT / "assets"
 UPLOADS_DIR = DATA_ROOT / "uploads"
 IMPORTS_DIR = DATA_ROOT / "imports"
