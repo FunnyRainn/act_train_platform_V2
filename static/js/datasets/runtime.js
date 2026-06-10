@@ -46,6 +46,29 @@ function projectLabels(projectId) {
   return (datasetData?.labels || []).filter(label => codes.has(label.code));
 }
 
+function focusRectsOverlap(a, b) {
+  if (!a || !b) return false;
+  const ax1 = Number(a.x);
+  const ay1 = Number(a.y);
+  const ax2 = ax1 + Number(a.w);
+  const ay2 = ay1 + Number(a.h);
+  const bx1 = Number(b.x);
+  const by1 = Number(b.y);
+  const bx2 = bx1 + Number(b.w);
+  const by2 = by1 + Number(b.h);
+  return Math.max(ax1, bx1) < Math.min(ax2, bx2) && Math.max(ay1, by1) < Math.min(ay2, by2);
+}
+
+function focusOverlapPairs(regions) {
+  const pairs = [];
+  for (let i = 0; i < regions.length; i += 1) {
+    for (let j = i + 1; j < regions.length; j += 1) {
+      if (focusRectsOverlap(regions[i], regions[j])) pairs.push([regions[i], regions[j]]);
+    }
+  }
+  return pairs;
+}
+
 function renderFocusExportPanel() {
   const panel = $("#focus-export-panel");
   const list = $("#focus-export-list");
@@ -56,6 +79,9 @@ function renderFocusExportPanel() {
   if (scope !== "focus_region_crop") return;
   const regions = (datasetData?.focus_regions || []).filter(item => item.project_id === projectId && Number(item.enabled) !== 0);
   const histories = projectDatasets(projectId);
+  const overlapNotice = focusOverlapPairs(regions).length
+    ? `<div class="row-meta">提示：当前关注区域存在重叠。导出裁剪数据集时，每个关注区域仍会独立生成数据集，重叠部分的完整标注框可能进入多个数据集。</div>`
+    : "";
   list.innerHTML = regions.length ? regions.map(region => `
     <div class="focus-export-item">
       <label class="inline"><input type="checkbox" data-focus-region="${esc(region.id)}"> ${esc(region.name)}</label>
@@ -63,7 +89,7 @@ function renderFocusExportPanel() {
         ${histories.map(ds => `<option value="${esc(ds.id)}">${esc(ds.name)} | ${esc(datasetScopeText(ds))}</option>`).join("")}
       </select>
     </div>
-  `).join("") : `<div class="notice">当前产品还没有关注区域，请先到标注工作台创建并锁定关注区域。</div>`;
+  `).join("") + overlapNotice : `<div class="notice">当前产品还没有关注区域，请先到标注工作台创建并锁定关注区域。</div>`;
 }
 
 function renderYoloImportOptions() {
@@ -125,6 +151,12 @@ async function exportDataset(annotatedOnly = false) {
   window.ActDatasets.FocusExport.collectFocusExportConfig(payload);
   if (payload.image_scope === "focus_region_crop" && !payload.focus_region_ids.length) {
     throw new Error("请选择至少一个关注区域");
+  }
+  if (payload.image_scope === "focus_region_crop") {
+    const selectedRegions = (datasetData?.focus_regions || []).filter(region => payload.focus_region_ids.includes(region.id));
+    if (focusOverlapPairs(selectedRegions).length) {
+      showToast("提示：已选择的关注区域存在重叠，重叠部分的完整标注框可能进入多个数据集。", "warn");
+    }
   }
   const hasFocusHistory = Object.values(payload.history_by_focus_region || {}).some(list => Array.isArray(list) && list.length);
   if (!payload.frame_set_ids.length && !payload.history_dataset_ids.length && !hasFocusHistory) {

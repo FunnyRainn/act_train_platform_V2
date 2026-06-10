@@ -348,10 +348,6 @@ def save_focus_region(payload: dict[str, Any]) -> dict[str, Any]:
     region_id = payload.get("id") or new_id("focus")
     name = str(payload.get("name") or "未命名关注区域").strip()
     x, y, w, h = _normalize_rect(payload)
-    candidate = {"id": region_id, "x": x, "y": y, "w": w, "h": h}
-    for region in list_focus_regions(project_id, enabled_only=True):
-        if region["id"] != region_id and _rects_overlap(candidate, region):
-            raise ValueError(f"关注区域不能重叠：{name} 与 {region['name']} 有重叠")
     with get_conn() as conn:
         conn.execute(
             """

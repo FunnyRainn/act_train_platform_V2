@@ -226,6 +226,23 @@ function rectOutsideFocus(box) {
   return !rectInsideFocus(box);
 }
 
+function rectsOverlap(a, b) {
+  if (!a || !b) return false;
+  const ax1 = Number(a.x);
+  const ay1 = Number(a.y);
+  const ax2 = ax1 + Number(a.w);
+  const ay2 = ay1 + Number(a.h);
+  const bx1 = Number(b.x);
+  const by1 = Number(b.y);
+  const bx2 = bx1 + Number(b.w);
+  const by2 = by1 + Number(b.h);
+  return Math.max(ax1, bx1) < Math.min(ax2, bx2) && Math.max(ay1, by1) < Math.min(ay2, by2);
+}
+
+function overlappingFocusRegions(region) {
+  return focusRegionsForCurrentProject().filter(item => item.id !== region.id && rectsOverlap(region, item));
+}
+
 function clampBox(box) {
   let x = Math.max(0, Math.min(1, Number(box.x) || 0));
   let y = Math.max(0, Math.min(1, Number(box.y) || 0));
@@ -520,6 +537,7 @@ function renderFocusRegions() {
     <div class="focus-region-item ${region.id === state.editingFocusId ? "editing" : ""}">
       <strong>${esc(region.name)}</strong>
       <span>${Number(region.x).toFixed(3)}, ${Number(region.y).toFixed(3)}, ${Number(region.w).toFixed(3)}, ${Number(region.h).toFixed(3)}</span>
+      ${overlappingFocusRegions(region).length ? `<div class="row-meta">提示：该关注区域与 ${esc(overlappingFocusRegions(region).map(item => item.name).join("、"))} 存在重叠。重叠是允许的，但后续绑定多个模型时可能重复识别同一区域。</div>` : ""}
       <button type="button" data-focus-edit="${esc(region.id)}">编辑</button>
       <button type="button" data-focus-delete="${esc(region.id)}">删除</button>
     </div>
@@ -645,6 +663,8 @@ $("#focus-confirm-btn")?.addEventListener("click", async () => {
     if (!state.focusDraft || !state.focusDraftIsNorm) throw new Error("请先在画面上拖拽关注区域");
     const name = $("#focus-region-name").value.trim();
     if (!name) throw new Error("请填写关注区域名称");
+    const candidate = { id: state.editingFocusId || "", name, ...state.focusDraft };
+    const overlaps = overlappingFocusRegions(candidate);
     await apiPost("/api/focus-regions", {
       id: state.editingFocusId || undefined,
       project_id: projectId,
@@ -660,7 +680,7 @@ $("#focus-confirm-btn")?.addEventListener("click", async () => {
     state.focusDrawing = false;
     $("#focus-region-name").value = "";
     await loadFocusRegions();
-    showToast("关注区域已保存并锁定");
+    showToast(overlaps.length ? "关注区域已保存；提示：该区域与已有关注区域重叠，后续多模型绑定时可能重复识别。" : "关注区域已保存并锁定", overlaps.length ? "warn" : "info");
     draw();
   } catch (error) {
     showToast(error.message, "error");
