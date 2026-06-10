@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.1.7`
+`v1.2.2.0`
 
 ## Repository
 
@@ -44,6 +44,12 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.2.0
+
+- Adds an optional custom pretrained model path for training jobs; blank input continues to use the backend default `yolo11m.pt` without exposing the default model on the page.
+- Allows overlapping focus regions while showing non-blocking warnings in annotation and dataset export flows.
+- Keeps the training job creation form stable during polling by refreshing only the job list and GPU status after initial page bootstrap.
 
 ## v1.2.1.7
 
