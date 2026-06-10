@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Request
 
 from core import training_ops
@@ -8,6 +10,20 @@ from web.context import api_error
 router = APIRouter()
 
 DEFAULT_BASE_MODEL = "yolo11m.pt"
+
+
+def _resolve_base_model_path(raw_value: object) -> str:
+    raw = str(raw_value or "").strip()
+    if not raw:
+        return DEFAULT_BASE_MODEL
+    path = Path(raw)
+    if not path.is_absolute():
+        raise ValueError("预训练模型路径必须是训练服务所在机器上的绝对路径。")
+    if path.suffix.lower() != ".pt":
+        raise ValueError("预训练模型文件必须是 .pt 文件。")
+    if not path.is_file():
+        raise FileNotFoundError(f"预训练模型文件不存在：{raw}")
+    return str(path)
 
 
 @router.get("/api/train-jobs")
@@ -23,7 +39,7 @@ async def create_train_job(request: Request) -> dict:
             payload["project_id"],
             payload["dataset_version_id"],
             payload.get("name") or "模型训练任务",
-            payload.get("base_model_path") or DEFAULT_BASE_MODEL,
+            _resolve_base_model_path(payload.get("base_model_path")),
             payload.get("params") or {},
         )
     except Exception as exc:

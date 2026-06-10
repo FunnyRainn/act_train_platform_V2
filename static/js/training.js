@@ -187,6 +187,7 @@ $("#train-form").addEventListener("submit", async event => {
       project_id: form.project_id.value,
       dataset_version_id: form.dataset_version_id.value,
       name: form.name.value,
+      base_model_path: form.base_model_path.value.trim(),
       params: {
         epochs: Number(form.epochs.value),
         imgsz: form.imgsz.value ? Number(form.imgsz.value) : null,
@@ -194,6 +195,7 @@ $("#train-form").addEventListener("submit", async event => {
         device: form.device.value,
       },
     });
+    form.base_model_path.value = "";
     showToast("模型训练任务已创建，后台开始运行。");
     await refreshTraining();
   } catch (error) {

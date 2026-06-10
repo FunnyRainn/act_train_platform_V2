@@ -14,6 +14,8 @@
     <label>训练数据集<select name="dataset_version_id"></select></label>
     <label>任务名称<input name="name" value="模型训练任务"></label>
     <div class="row-meta">基础模型由系统自动选择，客户无需配置。</div>
+    <label>预训练模型路径（可选）<input name="base_model_path" placeholder="E:\models\best.pt"></label>
+    <div class="row-meta">不填写时系统自动使用默认基础模型；填写时必须是训练服务所在机器上的绝对 .pt 文件路径。</div>
     <div class="form-row">
       <label>训练轮数<input name="epochs" type="number" value="50"></label>
       <label>输入尺寸<input name="imgsz" type="number" placeholder="自动推荐"></label>
