@@ -42,35 +42,12 @@ function drawChart(canvas, rows) {
   }
 }
 
-function captureTrainFormState() {
-  const form = $("#train-form");
-  return {
-    project_id: form.project_id.value,
-    dataset_version_id: form.dataset_version_id.value,
-    name: form.name.value,
-    epochs: form.epochs.value,
-    imgsz: form.imgsz.value,
-    batch: form.batch.value,
-    device: form.device.value,
-    activeName: document.activeElement?.name || "",
-  };
-}
+let trainingBootstrapData = null;
+let trainingStatusRefreshInFlight = false;
 
-function restoreTrainFormState(state) {
-  const form = $("#train-form");
-  for (const [key, value] of Object.entries(state)) {
-    if (key === "activeName") continue;
-    if (form[key] && value !== undefined) form[key].value = value;
-  }
-  if (state.activeName && form[state.activeName] && document.activeElement === document.body) {
-    form[state.activeName].focus();
-  }
-}
-
-function fillTrainSelects(data, state) {
+function fillTrainSelects(data) {
   fillSelect($("#train-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
   fillSelect($("#train-form select[name=dataset_version_id]"), data.datasets, item => item.id, item => `${item.name} (${item.status})`, "选择训练数据集");
-  restoreTrainFormState(state);
   updateImgSizeRecommendation(data.datasets);
 }
 
@@ -123,12 +100,8 @@ function supportText(job) {
   return "";
 }
 
-async function refreshTraining() {
-  const state = captureTrainFormState();
-  const data = await loadBootstrap();
-  fillTrainSelects(data, state);
-  await renderGpuStatus();
-  $("#train-list").innerHTML = data.train_jobs.map(job => {
+function renderTrainJobs(trainJobs) {
+  $("#train-list").innerHTML = trainJobs.map(job => {
     const p = job.progress || {};
     const canStop = job.status === "running" || job.status === "queued";
     const modelPackage = job.model_package;
@@ -155,7 +128,7 @@ async function refreshTraining() {
       `
     );
   }).join("");
-  for (const job of data.train_jobs) {
+  for (const job of trainJobs) {
     const canvas = document.querySelector(`canvas[data-job="${job.id}"]`);
     if (canvas) drawChart(canvas, job.progress?.series || []);
   }
@@ -164,12 +137,31 @@ async function refreshTraining() {
       try {
         await apiPost(`/api/train-jobs/${btn.dataset.stop}/stop`, {});
         showToast("训练停止命令已发送，若已有模型文件会自动整理到模型仓库。");
-        await refreshTraining();
+        await refreshTrainingStatus();
       } catch (error) {
         showToast(error.message, "error");
       }
     };
   });
+}
+
+async function refreshTrainingStatus() {
+  if (trainingStatusRefreshInFlight) return;
+  trainingStatusRefreshInFlight = true;
+  try {
+    const data = await loadBootstrap();
+    renderTrainJobs(data.train_jobs || []);
+    await renderGpuStatus();
+  } finally {
+    trainingStatusRefreshInFlight = false;
+  }
+}
+
+async function initializeTrainingPage() {
+  trainingBootstrapData = await loadBootstrap();
+  fillTrainSelects(trainingBootstrapData);
+  renderTrainJobs(trainingBootstrapData.train_jobs || []);
+  await renderGpuStatus();
 }
 
 async function renderGpuStatus() {
@@ -197,20 +189,14 @@ $("#train-form").addEventListener("submit", async event => {
     });
     form.base_model_path.value = "";
     showToast("模型训练任务已创建，后台开始运行。");
-    await refreshTraining();
+    await refreshTrainingStatus();
   } catch (error) {
     showToast(error.message, "error");
   }
 });
 
-$("#train-form select[name=dataset_version_id]").addEventListener("change", async () => {
-  try {
-    const data = await loadBootstrap();
-    updateImgSizeRecommendation(data.datasets);
-  } catch (_) {
-    $("#imgsz-recommendation").textContent = "输入尺寸默认按训练数据集图片尺寸自动推荐；需要时可手动填写覆盖。";
-  }
+$("#train-form select[name=dataset_version_id]").addEventListener("change", () => {
+  updateImgSizeRecommendation(trainingBootstrapData?.datasets || []);
 });
 
-refreshTraining();
-setInterval(refreshTraining, 6000);
+initializeTrainingPage().finally(() => setInterval(refreshTrainingStatus, 6000));
