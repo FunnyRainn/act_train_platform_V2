@@ -11,6 +11,13 @@ from core.utils import copy_file, new_id, safe_name
 
 
 def probe_video(path: Path) -> dict:
+    """用途：说明 视频导入、抽帧和媒体文件处理 中 `probe_video` 的职责和调用边界。
+    入参：path，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取、复制、写入媒体文件，并调用 OpenCV 处理视频帧。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         raise ValueError(f"无法打开视频: {path}")
@@ -30,6 +37,13 @@ def probe_video(path: Path) -> dict:
 
 
 def _create_product_video_from_asset(project_id: str, asset: dict) -> dict:
+    """用途：说明 视频导入、抽帧和媒体文件处理 中 `_create_product_video_from_asset` 的职责和调用边界。
+    入参：project_id、asset，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取、复制、写入媒体文件，并调用 OpenCV 处理视频帧。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     video_id = new_id("video")
     src = resolve_runtime_path(asset["stored_path"], "素材视频", require_exists=True)
     dst = UPLOADS_DIR / project_id / f"{video_id}_{safe_name(src.stem)}{src.suffix}"
@@ -52,6 +66,13 @@ def _create_product_video_from_asset(project_id: str, asset: dict) -> dict:
 
 
 def register_uploaded_video(project_id: str, filename: str, bytes_data: bytes) -> dict:
+    """用途：说明 视频导入、抽帧和媒体文件处理 中 `register_uploaded_video` 的职责和调用边界。
+    入参：project_id、filename、bytes_data，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取、复制、写入媒体文件，并调用 OpenCV 处理视频帧。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     asset_id = new_id("asset")
     suffix = Path(filename).suffix or ".mp4"
     save_path = ASSETS_DIR / f"{asset_id}_{safe_name(Path(filename).stem)}{suffix}"
@@ -72,6 +93,13 @@ def register_uploaded_video(project_id: str, filename: str, bytes_data: bytes) -
 
 
 def register_imported_video(project_id: str, source_path: str, copy_to_platform: bool = False) -> dict:
+    """用途：说明 视频导入、抽帧和媒体文件处理 中 `register_imported_video` 的职责和调用边界。
+    入参：project_id、source_path、copy_to_platform，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取、复制、写入媒体文件，并调用 OpenCV 处理视频帧。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     src = Path(source_path)
     if not src.exists():
         raise FileNotFoundError(f"视频不存在: {src}")
@@ -100,6 +128,13 @@ def extract_frames(
     name: str | None = None,
     overwrite: bool = False,
 ) -> dict:
+    """用途：说明 视频导入、抽帧和媒体文件处理 中 `extract_frames` 的职责和调用边界。
+    入参：video_id、sample_every_n_frames、max_frames、jpeg_quality、name、overwrite，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取、复制、写入媒体文件，并调用 OpenCV 处理视频帧。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     video = store.get_video(video_id)
     if sample_every_n_frames <= 0:
         raise ValueError("抽帧间隔必须大于 0")
@@ -108,6 +143,7 @@ def extract_frames(
         raise ValueError("帧集名称不能为空")
     existing = store.find_frame_set_by_name(video["project_id"], frame_set_name)
     if existing:
+        # 帧集名称默认不覆盖，只有调用方显式 overwrite 时才删除旧帧集和对应文件。
         if not overwrite:
             raise ValueError(f"帧集名称已存在: {frame_set_name}")
         store.delete_frame_set(existing["id"])
@@ -146,6 +182,7 @@ def extract_frames(
         if not ok:
             break
         if frame_index % sample_every_n_frames == 0:
+            # 抽帧产物固定写入平台 frames 目录，后续标注和数据集导出只依赖这些平台内文件。
             save_path = output_dir / f"frame_{frame_index:06d}.jpg"
             cv2.imwrite(str(save_path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
             saved_paths.append(save_path)

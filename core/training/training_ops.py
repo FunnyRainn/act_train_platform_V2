@@ -22,6 +22,13 @@ WORKER_LOG_NAME = "worker.log"
 
 
 def create_train_job(project_id: str, dataset_version_id: str, name: str, base_model_path: str, params: dict[str, Any]) -> dict:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `create_train_job` 的职责和调用边界。
+    入参：project_id、dataset_version_id、name、base_model_path、params，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     dataset = store.get_dataset_version(dataset_version_id)
     repair_dataset_artifacts(dataset["output_dir"])
     params = dict(params or {})
@@ -29,6 +36,7 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
     recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or (dataset.get("summary") or {}).get("recommended_imgsz") or 1280)
     raw_imgsz = params.get("imgsz")
     if raw_imgsz in {None, "", 0, "0", "auto"}:
+        # 页面留空或选择 auto 时使用数据集推荐尺寸，避免把内部默认值暴露给客户操作。
         params["imgsz"] = recommended_imgsz
         params["auto_imgsz"] = True
     else:
@@ -56,6 +64,7 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
     env = os.environ.copy()
     env.setdefault("PYTHONIOENCODING", "utf-8")
     if getattr(sys, "frozen", False):
+        # 打包态通过同一个 exe 拉起训练 worker，保证现场部署不依赖源码模块路径。
         worker_command = [sys.executable, "--train-worker", job_id]
     else:
         worker_command = [sys.executable, "-m", "core.train_worker", job_id]
@@ -78,6 +87,13 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
 
 
 def stop_train_job(job_id: str) -> dict:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `stop_train_job` 的职责和调用边界。
+    入参：job_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     job = store.get_train_job(job_id)
     pid = int(job.get("process_id") or 0)
     if pid > 0:
@@ -96,6 +112,13 @@ def stop_train_job(job_id: str) -> dict:
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_parse_datetime` 的职责和调用边界。
+    入参：value，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if not value:
         return None
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
@@ -107,10 +130,18 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 
 def _read_results_csv(job: dict) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_read_results_csv` 的职责和调用边界。
+    入参：job，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     path = resolve_runtime_path(job["output_dir"], "训练输出目录") / "train" / "results.csv"
     if not path.exists():
         return [], {}
     rows: list[dict[str, Any]] = []
+    # Ultralytics 的 results.csv 是训练进度和 ETA 的主事实来源，页面只消费解析后的摘要。
     with path.open("r", encoding="utf-8", errors="ignore", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -122,6 +153,13 @@ def _read_results_csv(job: dict) -> tuple[list[dict[str, Any]], dict[str, Any]]:
 
 
 def _float_or_none(value: Any) -> float | None:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_float_or_none` 的职责和调用边界。
+    入参：value，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     try:
         if value in {None, ""}:
             return None
@@ -131,6 +169,13 @@ def _float_or_none(value: Any) -> float | None:
 
 
 def _current_epoch_from_results(rows: list[dict[str, Any]], last: dict[str, Any]) -> int:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_current_epoch_from_results` 的职责和调用边界。
+    入参：rows、last，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     epoch_value = _float_or_none(last.get("epoch"))
     if epoch_value is not None and epoch_value >= 0:
         return max(int(epoch_value), len(rows))
@@ -138,6 +183,13 @@ def _current_epoch_from_results(rows: list[dict[str, Any]], last: dict[str, Any]
 
 
 def _estimate_eta_seconds(job: dict, current: int, total: int, last: dict[str, Any]) -> int | None:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_estimate_eta_seconds` 的职责和调用边界。
+    入参：job、current、total、last，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if job.get("status") in {"finished", "stopped", "failed"}:
         return None
     if current <= 0 or total <= 0 or current >= total:
@@ -156,6 +208,13 @@ def _estimate_eta_seconds(job: dict, current: int, total: int, last: dict[str, A
 
 
 def _available_model_files(job: dict) -> dict[str, str]:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_available_model_files` 的职责和调用边界。
+    入参：job，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     weights_dir = resolve_runtime_path(job["output_dir"], "训练输出目录") / "train" / "weights"
     files: dict[str, str] = {}
     for name in ["best.pt", "last.pt"]:
@@ -166,6 +225,13 @@ def _available_model_files(job: dict) -> dict[str, str]:
 
 
 def _worker_log_exists(job: dict) -> bool:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_worker_log_exists` 的职责和调用边界。
+    入参：job，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     try:
         output_dir = resolve_runtime_path(job["output_dir"], "训练输出目录")
         log_path = output_dir / WORKER_LOG_NAME
@@ -175,6 +241,13 @@ def _worker_log_exists(job: dict) -> bool:
 
 
 def _phase_text(job: dict, current_epoch: int) -> str:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_phase_text` 的职责和调用边界。
+    入参：job、current_epoch，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     status = job.get("status")
     if status == "queued":
         return "训练准备中"
@@ -198,6 +271,13 @@ def _phase_text(job: dict, current_epoch: int) -> str:
 
 
 def _existing_package_for_job(train_job_id: str) -> dict[str, Any] | None:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_existing_package_for_job` 的职责和调用边界。
+    入参：train_job_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     for package in store.list_model_packages():
         if package.get("train_job_id") == train_job_id:
             return package
@@ -205,12 +285,26 @@ def _existing_package_for_job(train_job_id: str) -> dict[str, Any] | None:
 
 
 def _default_package_name(job: dict[str, Any]) -> str:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_default_package_name` 的职责和调用边界。
+    入参：job，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     project = store.get_project(job["project_id"])
     product_name = project.get("product_name") or project.get("name") or "通用检测模型"
     return f"{product_name}-{job.get('name') or job['id']}"
 
 
 def get_train_job_with_progress(job_id: str, auto_package: bool = True) -> dict:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `get_train_job_with_progress` 的职责和调用边界。
+    入参：job_id、auto_package，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     job = store.get_train_job(job_id)
     rows, last = _read_results_csv(job)
     total = int(job["params"].get("epochs") or job.get("progress", {}).get("total_epochs") or 0)
@@ -237,15 +331,30 @@ def get_train_job_with_progress(job_id: str, auto_package: bool = True) -> dict:
 
 
 def list_train_jobs_with_progress(project_id: str | None = None) -> list[dict]:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `list_train_jobs_with_progress` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     return [get_train_job_with_progress(job["id"]) for job in store.list_train_jobs(project_id)]
 
 
 def ensure_model_package_for_job(job_id: str) -> dict[str, Any] | None:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `ensure_model_package_for_job` 的职责和调用边界。
+    入参：job_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     job = get_train_job_with_progress(job_id, auto_package=False)
     if job.get("status") not in {"finished", "stopped"}:
         return None
     if not (job.get("progress", {}).get("model_files") or {}):
         return None
+    # 模型包只在训练结束且已有权重文件后生成，避免把半成品 best.pt/last.pt 打包。
     existing = _existing_package_for_job(job_id)
     if existing:
         return existing
@@ -253,6 +362,13 @@ def ensure_model_package_for_job(job_id: str) -> dict[str, Any] | None:
 
 
 def read_gpu_status() -> dict:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `read_gpu_status` 的职责和调用边界。
+    入参：无。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     try:
         result = subprocess.run(
             [
@@ -284,6 +400,13 @@ def read_gpu_status() -> dict:
 
 
 def export_model_package(train_job_id: str, name: str, auto_package: bool = True) -> dict:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `export_model_package` 的职责和调用边界。
+    入参：train_job_id、name、auto_package，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     existing = _existing_package_for_job(train_job_id)
     if existing:
         return existing

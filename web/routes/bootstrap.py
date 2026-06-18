@@ -9,6 +9,13 @@ router = APIRouter()
 
 @router.get("/api/bootstrap")
 def bootstrap() -> dict:
+    """用途：说明 Web 路由、请求校验和页面 API 中 `bootstrap` 的职责和调用边界。
+    入参：无。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取请求体、调用业务服务、访问模板上下文或返回 HTTP 响应。
+    异常/失败语义：参数缺失、资源不存在或业务异常时，沿用原有 HTTPException 或异常传播语义。
+    """
+
     return {
         "labels": store.list_labels(),
         "projects": store.list_projects(),

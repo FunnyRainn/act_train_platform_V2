@@ -61,4 +61,11 @@ def clear_unconfirmed_prelabels(frame_set_id: str) -> dict:
 
 
 def confirm_all_prelabels(frame_set_id: str) -> dict:
+    """用途：说明 标注保存、插值和预标注处理 中 `confirm_all_prelabels` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入标注数据、轨迹数据和预标注结果。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     return store.confirm_frame_set_prelabels(frame_set_id)

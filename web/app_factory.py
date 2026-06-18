@@ -9,10 +9,17 @@ from core.paths import PROJECT_ROOT
 from web.context import AppContext, set_context
 from web.routes import annotation, bootstrap, catalog, datasets, media, packages, pages, training
 
-VERSION = "v1.2.2.0"
+VERSION = "v1.2.2.1"
 
 
 def create_app() -> FastAPI:
+    """用途：说明 Web 应用装配和请求上下文 中 `create_app` 的职责和调用边界。
+    入参：无。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取请求体、调用业务服务、访问模板上下文或返回 HTTP 响应。
+    异常/失败语义：参数缺失、资源不存在或业务异常时，沿用原有 HTTPException 或异常传播语义。
+    """
+
     app = FastAPI(title="act_train_platform", version=VERSION.removeprefix("v"))
     templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
     app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
@@ -20,6 +27,13 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def on_startup() -> None:
+        """用途：说明 Web 应用装配和请求上下文 中 `on_startup` 的职责和调用边界。
+        入参：无。
+        返回：保持原函数既有返回类型和返回内容。
+        副作用：可能读取请求体、调用业务服务、访问模板上下文或返回 HTTP 响应。
+        异常/失败语义：参数缺失、资源不存在或业务异常时，沿用原有 HTTPException 或异常传播语义。
+        """
+
         init_db()
 
     app.include_router(pages.router)

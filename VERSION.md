@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`v1.2.2.0`
+`v1.2.2.1`
 
 ## Repository
 
@@ -44,6 +44,14 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## v1.2.2.1
+
+本版本是训练平台后端中文注释治理版本，不改变接口、SQLite 结构、训练任务语义、数据集导出规则或页面行为。
+
+- 为 `app.py`、`core/**/*.py`、`web/**/*.py`、`scripts/check_train_core_flows.py` 中缺少说明的类、方法、路由处理器和关键 helper 补充标准中文 docstring。
+- 为 SQLite 仓储、数据集导入导出、训练 worker、模型包导出、视频抽帧、标注插值、路由校验和 smoke 临时数据根等关键路径补充中文解释性注释。
+- 本版本不治理 `static/`、`templates/`、`data/`、`dist/`、`build/`、运行 SQLite、训练输出、模型包或部署生成物。
 
 ## v1.2.2.0
 

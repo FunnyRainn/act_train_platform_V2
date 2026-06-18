@@ -13,6 +13,13 @@ from .utils import now_text
 
 
 def _worker_count(params: dict) -> int:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `_worker_count` 的职责和调用边界。
+    入参：params，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     raw = params.get("workers")
     if raw not in {None, "", "auto"}:
         return max(0, int(raw))
@@ -24,6 +31,13 @@ def _worker_count(params: dict) -> int:
 
 
 def run(job_id: str) -> None:
+    """用途：说明 训练任务、训练进度和模型包导出 中 `run` 的职责和调用边界。
+    入参：job_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建训练目录、启动或停止训练子进程、读取训练日志和模型权重。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     try:
         job = store.get_train_job(job_id)
         dataset = store.get_dataset_version(job["dataset_version_id"])

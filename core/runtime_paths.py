@@ -13,10 +13,24 @@ _DATA_MARKER = "act_train_platform/data/"
 
 
 def _normalise_text_path(value: str) -> str:
+    """用途：说明 运行路径解析和迁移兼容 中 `_normalise_text_path` 的职责和调用边界。
+    入参：value，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能解析运行目录、检查文件存在性或修复平台自有路径。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     return value.replace("\\", "/")
 
 
 def _is_under(path: Path, root: Path) -> bool:
+    """用途：说明 运行路径解析和迁移兼容 中 `_is_under` 的职责和调用边界。
+    入参：path、root，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能解析运行目录、检查文件存在性或修复平台自有路径。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     try:
         path.resolve().relative_to(root.resolve())
         return True
@@ -58,6 +72,13 @@ def map_to_current_data_root(value: str | Path | None) -> Path | None:
 
 
 def resolve_runtime_path(value: str | Path | None, label: str = "数据路径", require_exists: bool = False) -> Path:
+    """用途：说明 运行路径解析和迁移兼容 中 `resolve_runtime_path` 的职责和调用边界。
+    入参：value、label、require_exists，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能解析运行目录、检查文件存在性或修复平台自有路径。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     mapped = map_to_current_data_root(value)
     if mapped is None:
         raise FileNotFoundError(f"{label}为空")
@@ -67,6 +88,13 @@ def resolve_runtime_path(value: str | Path | None, label: str = "数据路径", 
 
 
 def runtime_path_exists(value: str | Path | None) -> bool:
+    """用途：说明 运行路径解析和迁移兼容 中 `runtime_path_exists` 的职责和调用边界。
+    入参：value，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能解析运行目录、检查文件存在性或修复平台自有路径。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     mapped = map_to_current_data_root(value)
     return bool(mapped and mapped.exists())
 
@@ -148,6 +176,13 @@ def repair_json_metadata_file(json_path: str | Path) -> int:
 
 
 def _replace_platform_data_paths(value):
+    """用途：说明 运行路径解析和迁移兼容 中 `_replace_platform_data_paths` 的职责和调用边界。
+    入参：value，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能解析运行目录、检查文件存在性或修复平台自有路径。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if isinstance(value, str):
         mapped = map_to_current_data_root(value)
         if mapped is not None and _DATA_MARKER in _normalise_text_path(value).lower():

@@ -11,10 +11,24 @@ from core.utils import new_id, now_text, safe_name
 
 
 def _path_exists(value: str | Path | None) -> bool:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `_path_exists` 的职责和调用边界。
+    入参：value，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     return runtime_path_exists(value)
 
 
 def _is_under(path: Path, root: Path) -> bool:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `_is_under` 的职责和调用边界。
+    入参：path、root，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     try:
         path.resolve().relative_to(root.resolve())
         return True
@@ -23,6 +37,13 @@ def _is_under(path: Path, root: Path) -> bool:
 
 
 def list_labels(enabled_only: bool = False) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_labels` 的职责和调用边界。
+    入参：enabled_only，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM labels"
     params: list[Any] = []
     if enabled_only:
@@ -33,11 +54,19 @@ def list_labels(enabled_only: bool = False) -> list[dict[str, Any]]:
 
 
 def upsert_label(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `upsert_label` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     code = str(payload["code"]).strip().upper()
     group_code = code[:1]
     if group_code not in {"A", "B", "C"}:
         raise ValueError("标签编码必须以 A、B 或 C 开头")
     with get_conn() as conn:
+        # 标签字典按编码做幂等 upsert，避免页面重复保存时生成多条同义标签。
         conn.execute(
             """
             INSERT INTO labels(code, group_code, name, description, box_instruction, enabled, updated_at)
@@ -64,6 +93,13 @@ def upsert_label(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def list_projects() -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_projects` 的职责和调用边界。
+    入参：无。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         rows = rows_to_dicts(conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall())
     for row in rows:
@@ -72,6 +108,13 @@ def list_projects() -> list[dict[str, Any]]:
 
 
 def get_project(project_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_project` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone())
     if not row:
@@ -81,6 +124,13 @@ def get_project(project_id: str) -> dict[str, Any]:
 
 
 def save_project(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `save_project` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     project_id = payload.get("id") or new_id("project")
     label_codes = payload.get("label_codes") or []
     with get_conn() as conn:
@@ -112,6 +162,13 @@ def save_project(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def list_videos(project_id: str | None = None) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_videos` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM videos"
     params: list[Any] = []
     if project_id:
@@ -124,12 +181,26 @@ def list_videos(project_id: str | None = None) -> list[dict[str, Any]]:
 
 
 def list_video_assets() -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_video_assets` 的职责和调用边界。
+    入参：无。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         rows = rows_to_dicts(conn.execute("SELECT * FROM video_assets ORDER BY created_at DESC").fetchall())
     return [row for row in rows if _path_exists(row.get("stored_path"))]
 
 
 def get_video_asset(asset_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_video_asset` 的职责和调用边界。
+    入参：asset_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM video_assets WHERE id=?", (asset_id,)).fetchone())
     if not row:
@@ -138,6 +209,13 @@ def get_video_asset(asset_id: str) -> dict[str, Any]:
 
 
 def create_video_asset(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `create_video_asset` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     asset_id = payload.get("id") or new_id("asset")
     with get_conn() as conn:
         conn.execute(
@@ -162,6 +240,13 @@ def create_video_asset(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_video(video_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_video` 的职责和调用边界。
+    入参：video_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM videos WHERE id=?", (video_id,)).fetchone())
     if not row:
@@ -170,6 +255,13 @@ def get_video(video_id: str) -> dict[str, Any]:
 
 
 def create_video(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `create_video` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     video_id = payload.get("id") or new_id("video")
     with get_conn() as conn:
         conn.execute(
@@ -195,6 +287,13 @@ def create_video(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def list_frame_sets(project_id: str | None = None) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_frame_sets` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM frame_sets"
     params: list[Any] = []
     if project_id:
@@ -221,6 +320,13 @@ def list_frame_sets(project_id: str | None = None) -> list[dict[str, Any]]:
 
 
 def find_frame_set_by_name(project_id: str, name: str) -> dict[str, Any] | None:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `find_frame_set_by_name` 的职责和调用边界。
+    入参：project_id、name，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(
             conn.execute(
@@ -235,6 +341,13 @@ def find_frame_set_by_name(project_id: str, name: str) -> dict[str, Any] | None:
 
 
 def get_frame_set(frame_set_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_frame_set` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM frame_sets WHERE id=?", (frame_set_id,)).fetchone())
     if not row:
@@ -244,6 +357,13 @@ def get_frame_set(frame_set_id: str) -> dict[str, Any]:
 
 
 def create_frame_set(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `create_frame_set` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     frame_set_id = payload.get("id") or new_id("frameset")
     with get_conn() as conn:
         conn.execute(
@@ -268,6 +388,13 @@ def create_frame_set(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_frame_set_status(frame_set_id: str, status: str, frame_count: int | None = None) -> None:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `update_frame_set_status` 的职责和调用边界。
+    入参：frame_set_id、status、frame_count，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         if frame_count is None:
             conn.execute("UPDATE frame_sets SET status=? WHERE id=?", (status, frame_set_id))
@@ -276,6 +403,13 @@ def update_frame_set_status(frame_set_id: str, status: str, frame_count: int | N
 
 
 def insert_frames(frame_set_id: str, video_id: str, frame_paths: list[Path]) -> None:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `insert_frames` 的职责和调用边界。
+    入参：frame_set_id、video_id、frame_paths，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     frame_set = get_frame_set(frame_set_id)
     with get_conn() as conn:
         conn.execute("DELETE FROM frames WHERE frame_set_id=?", (frame_set_id,))
@@ -300,6 +434,13 @@ def insert_frames(frame_set_id: str, video_id: str, frame_paths: list[Path]) -> 
 
 
 def _normalize_rect(payload: dict[str, Any]) -> tuple[float, float, float, float]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `_normalize_rect` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     x = max(0.0, min(1.0, float(payload.get("x") or 0)))
     y = max(0.0, min(1.0, float(payload.get("y") or 0)))
     w = max(0.001, min(1.0, float(payload.get("w") or 0.001)))
@@ -312,6 +453,13 @@ def _normalize_rect(payload: dict[str, Any]) -> tuple[float, float, float, float
 
 
 def _rects_overlap(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `_rects_overlap` 的职责和调用边界。
+    入参：a、b，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     ax1, ay1 = float(a["x"]), float(a["y"])
     ax2, ay2 = ax1 + float(a["w"]), ay1 + float(a["h"])
     bx1, by1 = float(b["x"]), float(b["y"])
@@ -320,6 +468,13 @@ def _rects_overlap(a: dict[str, Any], b: dict[str, Any]) -> bool:
 
 
 def list_focus_regions(project_id: str | None = None, enabled_only: bool = False) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_focus_regions` 的职责和调用边界。
+    入参：project_id、enabled_only，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM focus_regions"
     params: list[Any] = []
     where: list[str] = []
@@ -336,6 +491,13 @@ def list_focus_regions(project_id: str | None = None, enabled_only: bool = False
 
 
 def get_focus_region(region_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_focus_region` 的职责和调用边界。
+    入参：region_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM focus_regions WHERE id=?", (region_id,)).fetchone())
     if not row:
@@ -344,6 +506,13 @@ def get_focus_region(region_id: str) -> dict[str, Any]:
 
 
 def save_focus_region(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `save_focus_region` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     project_id = str(payload["project_id"])
     region_id = payload.get("id") or new_id("focus")
     name = str(payload.get("name") or "未命名关注区域").strip()
@@ -380,6 +549,13 @@ def save_focus_region(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def delete_focus_region(region_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `delete_focus_region` 的职责和调用边界。
+    入参：region_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     region = get_focus_region(region_id)
     with get_conn() as conn:
         conn.execute("DELETE FROM focus_regions WHERE id=?", (region_id,))
@@ -387,6 +563,13 @@ def delete_focus_region(region_id: str) -> dict[str, Any]:
 
 
 def delete_frame_set(frame_set_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `delete_frame_set` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     frame_set = get_frame_set(frame_set_id)
     output_dir = resolve_runtime_path(frame_set["output_dir"], "帧集目录")
     if output_dir.exists():
@@ -399,6 +582,13 @@ def delete_frame_set(frame_set_id: str) -> dict[str, Any]:
 
 
 def list_frames(frame_set_id: str) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_frames` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         return rows_to_dicts(
             conn.execute("SELECT * FROM frames WHERE frame_set_id=? ORDER BY frame_index", (frame_set_id,)).fetchall()
@@ -406,6 +596,13 @@ def list_frames(frame_set_id: str) -> list[dict[str, Any]]:
 
 
 def get_frame(frame_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_frame` 的职责和调用边界。
+    入参：frame_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM frames WHERE id=?", (frame_id,)).fetchone())
     if not row:
@@ -414,6 +611,13 @@ def get_frame(frame_id: str) -> dict[str, Any]:
 
 
 def list_annotations(frame_set_id: str, frame_id: str | None = None) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_annotations` 的职责和调用边界。
+    入参：frame_set_id、frame_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM annotations WHERE frame_set_id=?"
     params: list[Any] = [frame_set_id]
     if frame_id:
@@ -425,10 +629,18 @@ def list_annotations(frame_set_id: str, frame_id: str | None = None) -> list[dic
 
 
 def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str, annotations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `replace_frame_annotations` 的职责和调用边界。
+    入参：project_id、frame_set_id、frame_id、annotations，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     frame = get_frame(frame_id)
     if frame["frame_set_id"] != frame_set_id:
         raise ValueError(f"帧 {frame_id} 不属于帧集 {frame_set_id}，拒绝覆盖标注")
     with get_conn() as conn:
+        # 单帧标注采用整帧替换语义，前端提交的是该帧当前完整标注快照。
         conn.execute("DELETE FROM annotations WHERE frame_id=?", (frame_id,))
         for item in annotations:
             conn.execute(
@@ -458,6 +670,13 @@ def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str,
 
 
 def add_annotation(project_id: str, frame_set_id: str, frame_id: str, item: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `add_annotation` 的职责和调用边界。
+    入参：project_id、frame_set_id、frame_id、item，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     annotation_id = item.get("id") or new_id("ann")
     with get_conn() as conn:
         conn.execute(
@@ -487,6 +706,13 @@ def add_annotation(project_id: str, frame_set_id: str, frame_id: str, item: dict
 
 
 def delete_track_interpolated(frame_set_id: str, track_id: str) -> None:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `delete_track_interpolated` 的职责和调用边界。
+    入参：frame_set_id、track_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         conn.execute(
             "DELETE FROM annotations WHERE frame_set_id=? AND track_id=? AND source='interpolated' AND is_keyframe=0",
@@ -495,11 +721,25 @@ def delete_track_interpolated(frame_set_id: str, track_id: str) -> None:
 
 
 def delete_frame_prelabels(frame_id: str) -> None:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `delete_frame_prelabels` 的职责和调用边界。
+    入参：frame_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         conn.execute("DELETE FROM annotations WHERE frame_id=? AND source='prelabel' AND confirmed=0", (frame_id,))
 
 
 def delete_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `delete_frame_set_prelabels` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     get_frame_set(frame_set_id)
     with get_conn() as conn:
         cur = conn.execute(
@@ -510,6 +750,13 @@ def delete_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
 
 
 def confirm_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `confirm_frame_set_prelabels` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     get_frame_set(frame_set_id)
     with get_conn() as conn:
         cur = conn.execute(
@@ -520,6 +767,13 @@ def confirm_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
 
 
 def count_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `count_frame_set_prelabels` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     get_frame_set(frame_set_id)
     with get_conn() as conn:
         total = conn.execute("SELECT COUNT(*) FROM annotations WHERE frame_set_id=? AND source='prelabel'", (frame_set_id,)).fetchone()[0]
@@ -530,6 +784,13 @@ def count_frame_set_prelabels(frame_set_id: str) -> dict[str, Any]:
 
 
 def create_or_get_track(project_id: str, frame_set_id: str, label_code: str, track_id: str | None = None) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `create_or_get_track` 的职责和调用边界。
+    入参：project_id、frame_set_id、label_code、track_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         if track_id:
             row = row_to_dict(conn.execute("SELECT * FROM tracks WHERE id=?", (track_id,)).fetchone())
@@ -544,13 +805,28 @@ def create_or_get_track(project_id: str, frame_set_id: str, label_code: str, tra
 
 
 def list_tracks(frame_set_id: str) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_tracks` 的职责和调用边界。
+    入参：frame_set_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         return rows_to_dicts(conn.execute("SELECT * FROM tracks WHERE frame_set_id=? ORDER BY created_at", (frame_set_id,)).fetchall())
 
 
 def save_dataset_version(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `save_dataset_version` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     dataset_id = payload.get("id") or new_id("dataset")
     with get_conn() as conn:
+        # 数据集版本只在 SQLite 保存索引和 JSON 摘要，真实图片/标签文件由导出目录持有。
         conn.execute(
             """
             INSERT INTO dataset_versions(id, project_id, name, output_dir, label_codes_json, frame_set_ids_json, history_dataset_ids_json, status, summary_json, metadata_json)
@@ -573,6 +849,13 @@ def save_dataset_version(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_dataset_version(dataset_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_dataset_version` 的职责和调用边界。
+    入参：dataset_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM dataset_versions WHERE id=?", (dataset_id,)).fetchone())
     if not row:
@@ -586,6 +869,13 @@ def get_dataset_version(dataset_id: str) -> dict[str, Any]:
 
 
 def list_dataset_versions(project_id: str | None = None) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_dataset_versions` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM dataset_versions"
     params: list[Any] = []
     if project_id:
@@ -604,6 +894,13 @@ def list_dataset_versions(project_id: str | None = None) -> list[dict[str, Any]]
 
 
 def save_train_job(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `save_train_job` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     job_id = payload.get("id") or new_id("train")
     with get_conn() as conn:
         conn.execute(
@@ -630,10 +927,18 @@ def save_train_job(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_train_job(job_id: str, **updates: Any) -> None:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `update_train_job` 的职责和调用边界。
+    入参：job_id、**updates，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     allowed = {"status", "progress_json", "metrics_json", "log_text", "process_id", "started_at", "finished_at"}
     fields = []
     values = []
     for key, value in updates.items():
+        # 只允许训练任务运行态字段被补丁更新，避免调用方误写不可变业务字段。
         if key not in allowed:
             continue
         fields.append(f"{key}=?")
@@ -646,6 +951,13 @@ def update_train_job(job_id: str, **updates: Any) -> None:
 
 
 def get_train_job(job_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_train_job` 的职责和调用边界。
+    入参：job_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM train_jobs WHERE id=?", (job_id,)).fetchone())
     if not row:
@@ -657,6 +969,13 @@ def get_train_job(job_id: str) -> dict[str, Any]:
 
 
 def list_train_jobs(project_id: str | None = None) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_train_jobs` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM train_jobs"
     params: list[Any] = []
     if project_id:
@@ -673,6 +992,13 @@ def list_train_jobs(project_id: str | None = None) -> list[dict[str, Any]]:
 
 
 def save_model_package(payload: dict[str, Any]) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `save_model_package` 的职责和调用边界。
+    入参：payload，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     package_id = payload.get("id") or new_id("package")
     with get_conn() as conn:
         conn.execute(
@@ -694,6 +1020,13 @@ def save_model_package(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_model_package(package_id: str) -> dict[str, Any]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `get_model_package` 的职责和调用边界。
+    入参：package_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     with get_conn() as conn:
         row = row_to_dict(conn.execute("SELECT * FROM model_packages WHERE id=?", (package_id,)).fetchone())
     if not row:
@@ -703,6 +1036,13 @@ def get_model_package(package_id: str) -> dict[str, Any]:
 
 
 def list_model_packages(project_id: str | None = None) -> list[dict[str, Any]]:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `list_model_packages` 的职责和调用边界。
+    入参：project_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     sql = "SELECT * FROM model_packages"
     params: list[Any] = []
     if project_id:
@@ -717,6 +1057,13 @@ def list_model_packages(project_id: str | None = None) -> list[dict[str, Any]]:
 
 
 def make_named_dir(root: Path, name: str) -> Path:
+    """用途：说明 SQLite 仓储读写和兼容数据访问 中 `make_named_dir` 的职责和调用边界。
+    入参：root、name，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取或写入 SQLite，并按既有逻辑归一化返回数据。
+    异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
+    """
+
     path = root / safe_name(name)
     path.mkdir(parents=True, exist_ok=True)
     return path

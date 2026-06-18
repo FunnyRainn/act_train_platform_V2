@@ -17,6 +17,13 @@ SPLITS = ["train", "val", "test"]
 
 
 def _dataset_root(dataset_dir: str | Path) -> Path:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_dataset_root` 的职责和调用边界。
+    入参：dataset_dir，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     root = Path(dataset_dir).expanduser()
     if not root.exists() or not root.is_dir():
         raise FileNotFoundError(f"数据集目录不存在: {root}")
@@ -24,6 +31,13 @@ def _dataset_root(dataset_dir: str | Path) -> Path:
 
 
 def _find_yaml(root: Path) -> Path:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_find_yaml` 的职责和调用边界。
+    入参：root，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     for name in ("data.yaml", "dataset.yaml"):
         path = root / name
         if path.exists():
@@ -35,6 +49,13 @@ def _find_yaml(root: Path) -> Path:
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_read_yaml` 的职责和调用边界。
+    入参：path，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"YAML 内容必须是对象: {path}")
@@ -42,6 +63,13 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 
 
 def _parse_names(raw: Any) -> list[str]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_parse_names` 的职责和调用边界。
+    入参：raw，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if isinstance(raw, list):
         return [str(item).strip() for item in raw]
     if isinstance(raw, dict):
@@ -51,6 +79,13 @@ def _parse_names(raw: Any) -> list[str]:
 
 
 def _path_from_yaml(root: Path, raw: Any) -> Path | None:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_path_from_yaml` 的职责和调用边界。
+    入参：root、raw，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if not raw:
         return None
     if isinstance(raw, list):
@@ -64,6 +99,13 @@ def _path_from_yaml(root: Path, raw: Any) -> Path | None:
 
 
 def _yaml_base_root(root: Path, yaml_data: dict[str, Any]) -> Path:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_yaml_base_root` 的职责和调用边界。
+    入参：root、yaml_data，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     raw = yaml_data.get("path")
     if not raw:
         return root
@@ -74,6 +116,13 @@ def _yaml_base_root(root: Path, yaml_data: dict[str, Any]) -> Path:
 
 
 def _labels_for_images_dir(images_dir: Path) -> Path:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_labels_for_images_dir` 的职责和调用边界。
+    入参：images_dir，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     parts = list(images_dir.parts)
     for index in range(len(parts) - 1, -1, -1):
         if parts[index].lower() == "images":
@@ -85,6 +134,13 @@ def _labels_for_images_dir(images_dir: Path) -> Path:
 
 
 def _split_dirs(root: Path, yaml_data: dict[str, Any]) -> dict[str, tuple[Path, Path]]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_split_dirs` 的职责和调用边界。
+    入参：root、yaml_data，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     result: dict[str, tuple[Path, Path]] = {}
     for split in SPLITS:
         images_dir = _path_from_yaml(root, yaml_data.get(split))
@@ -97,12 +153,26 @@ def _split_dirs(root: Path, yaml_data: dict[str, Any]) -> dict[str, tuple[Path, 
 
 
 def _iter_images(path: Path) -> list[Path]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_iter_images` 的职责和调用边界。
+    入参：path，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if not path.exists():
         return []
     return sorted(item for item in path.rglob("*") if item.is_file() and item.suffix.lower() in IMAGE_SUFFIXES)
 
 
 def _read_image_size(path: Path) -> tuple[int, int] | None:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_read_image_size` 的职责和调用边界。
+    入参：path，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     image = cv2.imread(str(path))
     if image is None:
         return None
@@ -111,11 +181,25 @@ def _read_image_size(path: Path) -> tuple[int, int] | None:
 
 
 def _label_path_for_image(image: Path, images_dir: Path, labels_dir: Path) -> Path:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_label_path_for_image` 的职责和调用边界。
+    入参：image、images_dir、labels_dir，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     relative = image.relative_to(images_dir)
     return (labels_dir / relative).with_suffix(".txt")
 
 
 def _validate_label_line(line: str, names: list[str], line_context: str) -> tuple[int, list[str]]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_validate_label_line` 的职责和调用边界。
+    入参：line、names、line_context，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     parts = line.strip().split()
     if not parts:
         raise ValueError("empty")
@@ -136,6 +220,13 @@ def _validate_label_line(line: str, names: list[str], line_context: str) -> tupl
 
 
 def _suggest_mapping(names: list[str], project: dict[str, Any]) -> dict[str, str]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_suggest_mapping` 的职责和调用边界。
+    入参：names、project，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     labels = {label["code"]: label for label in store.list_labels()}
     selected_codes = set(project.get("label_codes") or [])
     by_name = {str(label.get("name") or "").strip(): code for code, label in labels.items() if code in selected_codes}
@@ -152,8 +243,16 @@ def _suggest_mapping(names: list[str], project: dict[str, Any]) -> dict[str, str
 
 
 def inspect_yolo_dataset(project_id: str, dataset_dir: str) -> dict[str, Any]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `inspect_yolo_dataset` 的职责和调用边界。
+    入参：project_id、dataset_dir，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     project = store.get_project(project_id)
     root = _dataset_root(dataset_dir)
+    # 先按 YOLO 原始结构读取 yaml 和 split 目录，只做检查，不复制任何数据。
     yaml_path = _find_yaml(root)
     yaml_data = _read_yaml(yaml_path)
     base_root = _yaml_base_root(root, yaml_data)
@@ -223,10 +322,18 @@ def inspect_yolo_dataset(project_id: str, dataset_dir: str) -> dict[str, Any]:
 
 
 def _normalized_mapping(label_mapping: dict[str, Any], names: list[str]) -> dict[int, str]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_normalized_mapping` 的职责和调用边界。
+    入参：label_mapping、names，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     output: dict[int, str] = {}
     for raw_key, raw_value in (label_mapping or {}).items():
         if raw_value is None or raw_value == "":
             continue
+        # 外部类别编号必须映射到当前产品已启用的本地标签，导入时再重写 class id。
         idx = int(raw_key)
         if idx < 0 or idx >= len(names):
             raise ValueError(f"标签映射包含不存在的外部类别: {idx}")
@@ -237,6 +344,13 @@ def _normalized_mapping(label_mapping: dict[str, Any], names: list[str]) -> dict
 
 
 def _remove_output_dir(output_dir: Path) -> None:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_remove_output_dir` 的职责和调用边界。
+    入参：output_dir，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
@@ -249,8 +363,16 @@ def import_yolo_dataset(
     image_scope: str = "full_image",
     focus_region_id: str | None = None,
 ) -> dict[str, Any]:
+    """用途：说明 YOLO 数据集导入、导出和版本管理 中 `import_yolo_dataset` 的职责和调用边界。
+    入参：project_id、name、dataset_dir、label_mapping、image_scope、focus_region_id，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能读取视频帧、复制数据文件、写入数据集目录和元数据文件。
+    异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
+    """
+
     project = store.get_project(project_id)
     root = _dataset_root(dataset_dir)
+    # 导入阶段重新读取并校验源数据，避免用户在 inspect 和 confirm 之间改动目录。
     yaml_path = _find_yaml(root)
     yaml_data = _read_yaml(yaml_path)
     base_root = _yaml_base_root(root, yaml_data)
@@ -301,6 +423,7 @@ def import_yolo_dataset(
                 stem = safe_name(str(relative.with_suffix("")), "image")
                 dst_img = images_by_split[split] / f"{stem}{image.suffix.lower()}"
                 dst_label = labels_by_split[split] / f"{stem}.txt"
+                # 图片复制进平台数据目录后再生成标签，外部目录后续移动不会影响平台数据集版本。
                 shutil.copy2(image, dst_img)
                 size = _read_image_size(dst_img)
                 if size:

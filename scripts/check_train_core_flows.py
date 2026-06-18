@@ -16,6 +16,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 def _write_tiny_video(path: Path) -> None:
+    """用途：说明 训练平台核心流程 smoke 验证 中 `_write_tiny_video` 的职责和调用边界。
+    入参：path，按函数签名和调用上下文传入。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建临时数据目录、生成测试视频并通过 TestClient 调用本地接口。
+    异常/失败语义：任一步接口返回异常状态或产物缺失时，沿用 assert/异常使脚本失败。
+    """
+
     path.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 5.0, (64, 48))
     if not writer.isOpened():
@@ -29,7 +36,15 @@ def _write_tiny_video(path: Path) -> None:
 
 
 def main() -> None:
+    """用途：说明 训练平台核心流程 smoke 验证 中 `main` 的职责和调用边界。
+    入参：无。
+    返回：保持原函数既有返回类型和返回内容。
+    副作用：可能创建临时数据目录、生成测试视频并通过 TestClient 调用本地接口。
+    异常/失败语义：任一步接口返回异常状态或产物缺失时，沿用 assert/异常使脚本失败。
+    """
+
     with tempfile.TemporaryDirectory(prefix="act_train_flow_") as tmp:
+        # smoke 检查强制使用临时数据根，避免污染现场或开发机的真实训练数据目录。
         os.environ["ACT_TRAIN_DATA_ROOT"] = str(Path(tmp) / "data")
 
         from web.app_factory import create_app
@@ -42,6 +57,7 @@ def main() -> None:
                 json={"code": "A1", "name": "测试动作", "description": "", "box_instruction": "", "enabled": True},
             )
             assert label.status_code == 200, label.text
+            # 覆盖最小核心链路：建产品、导入视频、抽帧、保存标注、导出 YOLO 数据集。
             project = client.post(
                 "/api/projects",
                 json={
