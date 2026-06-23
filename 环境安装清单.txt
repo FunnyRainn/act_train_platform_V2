@@ -1,0 +1,116 @@
+act_train_platform 环境安装清单
+更新时间：2026-06-23
+
+一、用途
+
+本清单只针对训练平台 act_train_platform。
+用于在另一台电脑上创建 Python/Conda 环境，并安装运行源码所需依赖。
+
+现有项目内已经有依赖入口文件：
+
+  requirements.txt
+
+该文件是 pip 安装用的正式依赖清单，本文件是给人工部署时看的安装说明。
+
+
+二、当前源码启动脚本使用的环境名
+
+当前文件：
+
+  启动act_train_platform源码.cmd
+
+里面执行的是：
+
+  conda activate act_server_py310
+
+因此如果不修改启动脚本，新电脑上需要准备同名 conda 环境：
+
+  act_server_py310
+
+说明：
+
+  1. 这是为了兼容当前项目已有启动方式。
+  2. 如果后续要把训练平台改成独立环境，例如 act_train_py310，需要同步修改启动脚本。
+  3. 本清单只列安装方式，不修改任何启动脚本。
+
+
+三、推荐创建环境命令
+
+在目标电脑 CMD 或 PowerShell 中执行：
+
+  conda create -n act_server_py310 python=3.10 -y
+  conda activate act_server_py310
+  python -m pip install --upgrade pip
+
+
+四、安装项目依赖
+
+进入 act_train_platform 目录：
+
+  cd /d D:\你的部署目录\act_train_platform
+
+安装 requirements.txt：
+
+  python -m pip install -r requirements.txt
+
+
+五、requirements.txt 当前内容
+
+以下内容来自当前项目 requirements.txt：
+
+  fastapi>=0.110.0
+  uvicorn[standard]>=0.27.0
+  jinja2>=3.1.0
+  python-multipart>=0.0.9
+  ultralytics>=8.3.0
+  opencv-python>=4.8.0
+  PyYAML>=6.0.1
+  numpy>=1.24.0
+  pandas>=2.0.0
+  rich>=13.7.0
+
+
+六、重要依赖说明
+
+1. torch / torchvision
+
+  训练实际依赖 PyTorch。
+  当前 requirements.txt 没有单独写 torch 和 torchvision，因为 ultralytics 会把它们作为依赖拉下来。
+
+  如果目标电脑需要使用 NVIDIA GPU 训练，建议按目标电脑 CUDA 版本安装 GPU 版 PyTorch。
+  例如 CUDA 12.1 环境常见命令是：
+
+    python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+  如果只做 CPU 测试，直接执行 requirements.txt 通常也可以跑通页面和基础流程，但训练速度会很慢。
+
+2. pyinstaller
+
+  只有需要在目标电脑重新打包 exe 时才需要安装：
+
+    python -m pip install pyinstaller
+
+  仅运行源码不需要 pyinstaller。
+
+
+七、启动验证
+
+安装完成后，在 act_train_platform 目录执行：
+
+  python -m compileall app.py core web
+  python app.py --host 0.0.0.0 --port 18100
+
+浏览器访问：
+
+  http://127.0.0.1:18100/
+
+
+八、齐全性检查结论
+
+我已按当前源码 import 和项目打包脚本检查过：
+
+  1. requirements.txt 覆盖了源码运行主链路的直接依赖。
+  2. torch / torchvision 是训练后端依赖，会由 ultralytics 间接安装；如果要保证 GPU 训练效果，应按目标机 CUDA 版本单独确认 PyTorch 安装。
+  3. pyinstaller 只属于打包工具依赖，不属于源码运行依赖，所以不放入 requirements.txt。
+  4. 当前启动脚本仍使用 act_server_py310 环境名，新电脑如果不改脚本，应创建同名环境。
+
