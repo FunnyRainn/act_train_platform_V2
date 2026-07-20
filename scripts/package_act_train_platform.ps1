@@ -112,7 +112,7 @@ try {
     Write-Host "  $PackageRoot"
     Write-Host ""
     Write-Host "Run on target machine:"
-    Write-Host "  .\act_train_platform.exe --host 0.0.0.0 --port 18100"
+    Write-Host "  .\act_train_platform.exe --host 0.0.0.0 --port 28100"
 }
 finally {
     if ($null -ne $oldPath) {

@@ -21,7 +21,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Start act_train_platform")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=18100)
+    parser.add_argument("--port", type=int, default=28100)
     parser.add_argument("--train-worker", help="internal training worker job id")
     args = parser.parse_args()
     if args.train_worker:

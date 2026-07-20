@@ -5,7 +5,7 @@
 第一版直接使用已经具备训练依赖的 conda 环境运行。当前本机验证可用环境为：
 
 ```text
-conda activate act_server_py310
+conda activate act_server_py310_V2
 ```
 
 如果后续你确认 `train_act_det_yolo` 使用的是另一个训练环境，则把下面命令中的 Python 路径替换成该环境的 `python.exe`。
@@ -14,14 +14,14 @@ conda activate act_server_py310
 
 ```powershell
 cd act_train_platform
-conda activate act_server_py310
-python app.py --host 0.0.0.0 --port 18100
+conda activate act_server_py310_V2
+python app.py --host 0.0.0.0 --port 28100
 ```
 
 访问：
 
 ```text
-http://127.0.0.1:18100/
+http://127.0.0.1:28100/
 ```
 
 ## 2. 基础操作流程

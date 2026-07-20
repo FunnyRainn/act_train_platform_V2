@@ -48,13 +48,13 @@ pip install -r requirements.txt
 ## 3. 启动
 
 ```powershell
-python app.py --host 0.0.0.0 --port 18100
+python app.py --host 0.0.0.0 --port 28100
 ```
 
 浏览器访问：
 
 ```text
-http://127.0.0.1:18100/
+http://127.0.0.1:28100/
 ```
 
 ## 4. 第一版推荐流程

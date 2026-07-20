@@ -9,7 +9,7 @@ from core.paths import PROJECT_ROOT
 from web.context import AppContext, set_context
 from web.routes import annotation, bootstrap, catalog, datasets, media, packages, pages, training
 
-VERSION = "v1.2.2.1"
+VERSION = "V2.0.0.0"
 
 
 def create_app() -> FastAPI:
@@ -24,6 +24,12 @@ def create_app() -> FastAPI:
     templates = Jinja2Templates(directory=str(PROJECT_ROOT / "templates"))
     app.mount("/static", StaticFiles(directory=str(PROJECT_ROOT / "static")), name="static")
     set_context(AppContext(templates=templates, version=VERSION))
+
+    @app.get("/version")
+    def version() -> dict[str, str]:
+        """返回训练平台版本，供 V1/V2 同机部署时核对进程身份。"""
+
+        return {"version": VERSION}
 
     @app.on_event("startup")
     def on_startup() -> None:

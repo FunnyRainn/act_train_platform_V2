@@ -11,11 +11,11 @@ if errorlevel 1 (
 )
 
 cd /d "%PROJECT_DIR%"
-call conda activate act_server_py310
+call conda activate act_server_py310_V2
 if errorlevel 1 (
-    echo Failed to activate conda environment: act_server_py310
+    echo Failed to activate conda environment: act_server_py310_V2
     pause
     exit /b 1
 )
 
-python app.py --host 0.0.0.0 --port 18100
+python app.py --host 0.0.0.0 --port 28100

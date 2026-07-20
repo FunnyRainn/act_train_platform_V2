@@ -1,5 +1,5 @@
 act_train_platform 环境安装清单
-更新时间：2026-06-23
+更新时间：2026-07-20（V2.0.0.0）
 
 一、用途
 
@@ -21,26 +21,25 @@ act_train_platform 环境安装清单
 
 里面执行的是：
 
-  conda activate act_server_py310
+  conda activate act_server_py310_V2
 
 因此如果不修改启动脚本，新电脑上需要准备同名 conda 环境：
 
-  act_server_py310
+  act_server_py310_V2
 
 说明：
 
-  1. 这是为了兼容当前项目已有启动方式。
-  2. 如果后续要把训练平台改成独立环境，例如 act_train_py310，需要同步修改启动脚本。
-  3. 本清单只列安装方式，不修改任何启动脚本。
+  1. V2 按已确认方案与 Server V2 共用 `act_server_py310_V2`。
+  2. 该环境从 V1 的 `act_server_py310` 原样克隆，不升级任何依赖。
+  3. 不得修改或安装软件到 V1 环境。
 
 
 三、推荐创建环境命令
 
 在目标电脑 CMD 或 PowerShell 中执行：
 
-  conda create -n act_server_py310 python=3.10 -y
-  conda activate act_server_py310
-  python -m pip install --upgrade pip
+  conda create -n act_server_py310_V2 --clone act_server_py310 -y
+  conda activate act_server_py310_V2
 
 
 四、安装项目依赖
@@ -98,11 +97,11 @@ act_train_platform 环境安装清单
 安装完成后，在 act_train_platform 目录执行：
 
   python -m compileall app.py core web
-  python app.py --host 0.0.0.0 --port 18100
+  python app.py --host 0.0.0.0 --port 28100
 
 浏览器访问：
 
-  http://127.0.0.1:18100/
+  http://127.0.0.1:28100/
 
 
 八、齐全性检查结论
@@ -112,5 +111,5 @@ act_train_platform 环境安装清单
   1. requirements.txt 覆盖了源码运行主链路的直接依赖。
   2. torch / torchvision 是训练后端依赖，会由 ultralytics 间接安装；如果要保证 GPU 训练效果，应按目标机 CUDA 版本单独确认 PyTorch 安装。
   3. pyinstaller 只属于打包工具依赖，不属于源码运行依赖，所以不放入 requirements.txt。
-  4. 当前启动脚本仍使用 act_server_py310 环境名，新电脑如果不改脚本，应创建同名环境。
+  4. 当前 V2 启动脚本固定使用 act_server_py310_V2，不能回退到 V1 环境。
 

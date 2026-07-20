@@ -2,11 +2,11 @@
 
 ## Current Version
 
-`v1.2.2.1`
+`V2.0.0.0`
 
 ## Repository
 
-`https://github.com/FunnyRainn/act_train_platform.git`
+`https://github.com/FunnyRainn/act_train_platform_V2.git`
 
 ## Project Role
 
@@ -28,9 +28,7 @@ It is not responsible for production real-time inference, SOP alarm judgement, c
 
 ## Environment Rule
 
-The first version uses the existing `train_act_det_yolo` training conda environment. This avoids reinstalling GPU Torch, Ultralytics, OpenCV, and CUDA-related dependencies.
-
-Do not share the `act_web` or `act_server` runtime environment for training work.
+V2.0.0.0 按已确认部署方案与 Server V2 共用本地克隆环境 `act_server_py310_V2`，不升级依赖，也不修改 V1 环境。
 
 ## Version Rule
 
@@ -44,6 +42,14 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## V2.0.0.0
+
+V2 独立基线版本：
+
+- 从 `v1.2.2.1@36d9d7c6580834eea71834c3701da78c99e11089` 建立行为等价基线。
+- 训练平台使用独立目录、全新运行数据库、V2 环境和 28100 端口，并提供 `/version` 身份检查。
+- 本版本不复制 V1 训练任务、数据集、抽帧或运行历史，也不修改训练业务逻辑。
 
 ## v1.2.2.1
 

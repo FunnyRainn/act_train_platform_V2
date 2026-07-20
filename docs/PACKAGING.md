@@ -44,13 +44,13 @@ D:\act_det\act_train_platform
 ## 启动命令
 
 ```powershell
-.\act_train_platform.exe --host 0.0.0.0 --port 18100
+.\act_train_platform.exe --host 0.0.0.0 --port 28100
 ```
 
 浏览器访问：
 
 ```text
-http://127.0.0.1:18100/
+http://127.0.0.1:28100/
 ```
 
 局域网其他电脑访问时，将 `127.0.0.1` 换成部署电脑 IP。
