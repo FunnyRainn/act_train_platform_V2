@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`V2.0.0.0`
+`V2.0.0.1`
 
 ## Repository
 
@@ -42,6 +42,14 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## V2.0.0.1
+
+Mac 开发训练兼容版本：
+
+- 训练页面明确提示 Apple Silicon 使用 `mps`，Windows 默认设备 `0` 保持不变。
+- MPS 任务未显式设置 workers 时使用进程内数据加载，避免派生 DataLoader 进程阻塞启动。
+- 不修改数据集、标注、模型包、训练 API 或 Windows 打包语义。
 
 ## V2.0.0.0
 

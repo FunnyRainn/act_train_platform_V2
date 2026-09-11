@@ -23,6 +23,10 @@ def _worker_count(params: dict) -> int:
     raw = params.get("workers")
     if raw not in {None, "", "auto"}:
         return max(0, int(raw))
+    # Apple MPS 的验证环境采用进程内加载，避免训练子进程再派生 DataLoader
+    # 子进程造成启动不稳定；显式 workers 仍由调用方负责。
+    if str(params.get("device") or "").strip().lower() == "mps":
+        return 0
     # Packaged Windows executables are more reliable with in-process data
     # loading. It avoids PyInstaller/DataLoader child-process startup hangs.
     if os.name == "nt" or getattr(sys, "frozen", False):
@@ -64,7 +68,7 @@ def run(job_id: str) -> None:
             "epochs": int(params.get("epochs") or 50),
             "imgsz": int(params.get("imgsz") or 1280),
             "batch": int(params.get("batch") or 8),
-            "device": str(params.get("device") or "0"),
+            "device": str(params.get("device") or "0").strip(),
             "workers": _worker_count(params),
             "patience": int(params.get("patience") or 30),
             "plots": True,

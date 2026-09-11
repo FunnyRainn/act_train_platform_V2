@@ -20,9 +20,9 @@
       <label>训练轮数<input name="epochs" type="number" value="50"></label>
       <label>输入尺寸<input name="imgsz" type="number" placeholder="自动推荐"></label>
       <label>批次大小<input name="batch" type="number" value="8"></label>
-      <label>设备编号<input name="device" value="0"></label>
+      <label>训练设备<input name="device" value="0"></label>
     </div>
-    <div id="imgsz-recommendation" class="row-meta">输入尺寸默认按训练数据集图片尺寸自动推荐；需要时可手动填写覆盖。</div>
+    <div id="imgsz-recommendation" class="row-meta">输入尺寸默认按训练数据集图片尺寸自动推荐；Windows GPU 使用 0，Apple Silicon 使用 mps，CPU 使用 cpu。</div>
     <button class="primary" type="submit">启动训练</button>
   </form>
   <section class="panel">
