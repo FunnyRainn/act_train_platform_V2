@@ -70,9 +70,9 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
         worker_command = [sys.executable, "-m", "core.train_worker", job_id]
 
     worker_log_path = output_dir / WORKER_LOG_NAME
-    # 新成品的程序目录不可写；第三方训练库的相对下载/缓存归入本次任务资产。
-    # 源码模式仍从项目根启动 -m，旧打包布局也保留原有路径语义。
-    worker_cwd = output_dir if getattr(sys, "frozen", False) and env.get("ACT_DEPLOYMENT_ROOT") else PROJECT_ROOT
+    # 冻结子进程的相对下载/缓存归入任务数据，避免污染待更新的程序文件。
+    # 源码模式仍从项目根启动 -m；该规则不依赖任何顶层资产布局。
+    worker_cwd = output_dir if getattr(sys, "frozen", False) else PROJECT_ROOT
     log_handle = worker_log_path.open("a", encoding="utf-8", buffering=1)
     try:
         process = subprocess.Popen(

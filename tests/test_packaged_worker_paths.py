@@ -27,6 +27,6 @@ def test_worker_working_directory_preserves_source_mode(tmp_path, monkeypatch, f
     monkeypatch.setattr(training_ops.subprocess, "Popen", lambda command, **kwargs: (calls.append((command, kwargs)) or SimpleNamespace(pid=123)))
     training_ops.create_train_job("project", "dataset", "test", str(tmp_path / "local.pt"), {"epochs": 1})
     command, options = calls[0]
-    expected = tmp_path / "data/runs/project/job-test" if frozen and separated else training_ops.PROJECT_ROOT
+    expected = tmp_path / "data/runs/project/job-test" if frozen else training_ops.PROJECT_ROOT
     assert Path(options["cwd"]) == expected
     assert command == ([sys.executable, "--train-worker", "job-test"] if frozen else [sys.executable, "-m", "core.train_worker", "job-test"])
