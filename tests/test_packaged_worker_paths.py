@@ -19,7 +19,7 @@ def test_worker_working_directory_preserves_source_mode(tmp_path, monkeypatch, f
     monkeypatch.setattr(training_ops, "RUNS_DIR", tmp_path / "data/runs")
     monkeypatch.setattr(training_ops, "new_id", lambda prefix: "job-test")
     monkeypatch.setattr(training_ops, "repair_dataset_artifacts", lambda path: None)
-    monkeypatch.setattr(training_ops.store, "get_dataset_version", lambda key: {"output_dir": str(tmp_path), "metadata": {}})
+    monkeypatch.setattr(training_ops.store, "get_dataset_version", lambda key: {"project_id": "project", "output_dir": str(tmp_path), "metadata": {}})
     monkeypatch.setattr(training_ops.store, "save_train_job", lambda value: None)
     monkeypatch.setattr(training_ops.store, "update_train_job", lambda *args, **kwargs: None)
     monkeypatch.setattr(training_ops, "get_train_job_with_progress", lambda key: {"id": key})

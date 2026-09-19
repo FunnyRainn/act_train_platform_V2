@@ -4,7 +4,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 
-from core import training_ops
+from core import training_ops, store
+from core.task_contract import task_type
 from web.context import api_error
 
 router = APIRouter()
@@ -12,7 +13,7 @@ router = APIRouter()
 DEFAULT_BASE_MODEL = "yolo11m.pt"
 
 
-def _resolve_base_model_path(raw_value: object) -> str:
+def _resolve_base_model_path(raw_value: object, task: str = "detect") -> str:
     """用途：说明 Web 路由、请求校验和页面 API 中 `_resolve_base_model_path` 的职责和调用边界。
     入参：raw_value，按函数签名和调用上下文传入。
     返回：保持原函数既有返回类型和返回内容。
@@ -22,7 +23,8 @@ def _resolve_base_model_path(raw_value: object) -> str:
 
     raw = str(raw_value or "").strip()
     if not raw:
-        return DEFAULT_BASE_MODEL
+        task_type(task)
+        return {"detect": "yolo26n.pt", "instance_segment": "yolo26n-seg.pt", "semantic_segment": "yolo26n-sem.pt"}[task]
     path = Path(raw)
     # 自定义预训练模型必须是服务端本机绝对路径，前端只负责传入字符串。
     if not path.is_absolute():
@@ -62,7 +64,7 @@ async def create_train_job(request: Request) -> dict:
             payload["project_id"],
             payload["dataset_version_id"],
             payload.get("name") or "模型训练任务",
-            _resolve_base_model_path(payload.get("base_model_path")),
+            _resolve_base_model_path(payload.get("base_model_path"), (store.get_dataset_version(payload["dataset_version_id"]).get("metadata") or {}).get("task_type", "detect")),
             payload.get("params") or {},
         )
     except Exception as exc:

@@ -10,6 +10,7 @@ from . import store
 from .db import json_dumps
 from .runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from .utils import now_text
+from .task_contract import ULTRALYTICS_TASKS, require_task_match
 
 
 def _worker_count(params: dict) -> int:
@@ -77,6 +78,10 @@ def run(job_id: str) -> None:
         }
         print(f"训练参数: {train_kwargs}", flush=True)
         model = YOLO(job["base_model_path"])
+        # 读取模型本身的任务，不能根据文件名或用户声明强行把检测模型当分割。
+        task = require_task_match((dataset.get("metadata") or {}).get("task_type", "detect"), params.get("task_type", "detect"))
+        if model.task != ULTRALYTICS_TASKS[task]:
+            raise ValueError(f"基础模型任务{model.task}与数据集任务{task}不匹配")
         result = model.train(**train_kwargs)
         store.update_train_job(
             job_id,

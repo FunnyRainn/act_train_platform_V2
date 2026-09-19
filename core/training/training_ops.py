@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import shutil
@@ -16,6 +17,7 @@ from core import store
 from core.paths import PACKAGES_DIR, PROJECT_ROOT, RUNS_DIR
 from core.runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
+from core.task_contract import TaskContract, require_task_match
 
 
 WORKER_LOG_NAME = "worker.log"
@@ -33,6 +35,10 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
     repair_dataset_artifacts(dataset["output_dir"])
     params = dict(params or {})
     dataset_metadata = dataset.get("metadata") or {}
+    if dataset["project_id"] != project_id:
+        raise ValueError("训练数据集不属于当前项目")
+    # 旧数据集没有task_type时只解释为检测；显式不匹配在创建子进程前拒绝。
+    params["task_type"] = require_task_match(dataset_metadata.get("task_type", "detect"), params.get("task_type", dataset_metadata.get("task_type", "detect")))
     recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or (dataset.get("summary") or {}).get("recommended_imgsz") or 1280)
     raw_imgsz = params.get("imgsz")
     if raw_imgsz in {None, "", 0, "0", "auto"}:
@@ -438,7 +444,17 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
     dataset_metadata = dataset.get("metadata") or {}
     recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or job["params"].get("recommended_imgsz") or job["params"].get("imgsz") or 1280)
     trained_imgsz = int(job["params"].get("imgsz") or recommended_imgsz)
+    task = require_task_match(dataset_metadata.get("task_type", "detect"), job["params"].get("task_type", "detect"))
+    contract = TaskContract(
+        task_type=task, model_family="yolo", model_version=hashlib.sha256(Path(selected).read_bytes()).hexdigest(),
+        label_map=label_names, input_hw=(trained_imgsz, trained_imgsz),
+        output_layout={"detect": "ultralytics_boxes", "instance_segment": "ultralytics_instances", "semantic_segment": "ultralytics_semantic"}[task],
+        background_id=dataset_metadata.get("background_id") if task == "semantic_segment" else None,
+        ignore_id=dataset_metadata.get("ignore_id") if task == "semantic_segment" else None,
+    )
     manifest = {
+        "task_type": task,
+        "task_contract": contract.model_dump(mode="json"),
         "schema_version": "1.0",
         "package_id": package_id,
         "package_name": name,
