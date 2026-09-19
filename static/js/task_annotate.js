@@ -12,6 +12,11 @@
   const status = text => { el("status").textContent = text; el("status").dataset.dirty = String(dirty); };
   const attempt = fn => async event => { try { await fn(event); } catch (error) { status(error.message); showToast(error.message, "error"); } };
   const canLeave = () => (!dirty && !polygon.length) || window.confirm("当前标注尚未保存，放弃编辑并切换？");
+  function lockEditor(locked) {
+    // 列表/图片请求完成前禁止再次切换；旧帧列表不能在新图片加载后反向清空选择。
+    busy = locked; document.querySelector("main").inert = locked;
+    for (const key of ["project","set","frameset","frame"]) el(key).disabled = locked;
+  }
   const selectOptions = (target, rows, label) => fillSelect(el(target), rows, row => row.id, label);
   const endpoint = () => `/api/annotation-sets/${spec.id}/frames/${annotation.frame_id}`;
   const snapshot = () => ({objects: structuredClone(objects), mask: mask?.slice(), selected});
@@ -24,7 +29,7 @@
     dirty = true;
   }
   function reset() {
-    generation++; annotation = picture = mask = null; objects = []; undo = []; redo = []; polygon = []; selected = -1; dirty = false;
+    generation++; annotation = picture = mask = null; objects = []; undo = []; redo = []; polygon = []; selected = -1; dirty = false; drag = null; fragment = false;
     canvas.width = canvas.height = 1; el("empty").hidden = false; el("instances").replaceChildren(); status("请选择标注集和图片");
   }
   function position(event) {
@@ -103,17 +108,23 @@
     el(key).addEventListener("focus", () => { el(key).dataset.previous = el(key).value; });
     el(key).onchange = attempt(async () => {
       if (busy || !canLeave()) { el(key).value = el(key).dataset.previous || ""; return; }
-      if (key === "project") await loadProject();
-      else if (key === "set") { configure(); await loadFrame(); }
-      else if (key === "frameset") { reset(); selectOptions("frame", el(key).value ? await apiGet(`/api/frame-sets/${el(key).value}/frames`) : [], row => `${row.frame_index ?? row.id} · ${row.width}×${row.height}`); }
-      else await loadFrame();
-      el(key).dataset.previous = el(key).value;
+      lockEditor(true);
+      try {
+        if (key === "project") await loadProject();
+        else if (key === "set") { configure(); await loadFrame(); }
+        else if (key === "frameset") { reset(); selectOptions("frame", el(key).value ? await apiGet(`/api/frame-sets/${el(key).value}/frames`) : [], row => `${row.frame_index ?? row.id} · ${row.width}×${row.height}`); }
+        else await loadFrame();
+        el(key).dataset.previous = el(key).value;
+      } finally { lockEditor(false); }
     });
   });
   el("create").onsubmit = attempt(async event => {
     event.preventDefault(); if (!el("project").value) throw Error("请先选择项目"); if (!canLeave()) return;
-    const created = await apiPost("/api/annotation-sets", {project_id: el("project").value, name: el("name").value, task_type: el("task").value});
-    sets.push(created); selectOptions("set", sets, row => `${row.name} · ${names[row.task_type]}`); el("set").value = created.id; configure(); await loadFrame();
+    lockEditor(true);
+    try {
+      const created = await apiPost("/api/annotation-sets", {project_id: el("project").value, name: el("name").value, task_type: el("task").value});
+      sets.push(created); selectOptions("set", sets, row => `${row.name} · ${names[row.task_type]}`); el("set").value = created.id; configure(); await loadFrame();
+    } finally { lockEditor(false); }
   });
   const importPayload = () => ({project_id:el("project").value,name:el("import-name").value,task_type:el("import-task").value,source_dir:el("import-path").value.trim()});
   el("inspect").onclick = attempt(async () => {
@@ -123,13 +134,13 @@
   });
   el("import").onsubmit = attempt(async event => {
     event.preventDefault(); if(!el("project").value) throw Error("请先选择项目"); if(!canLeave()) return;
-    el("import").inert=true;
+    lockEditor(true);
     try {
       const result=await apiPost("/api/task-datasets/import",importPayload());
       await loadProject(); el("set").value=result.annotation_set.id; configure(); el("frameset").value=result.frame_set_id;
       selectOptions("frame",await apiGet(`/api/frame-sets/${result.frame_set_id}/frames`),row=>`${row.frame_index} · ${row.width}×${row.height}`);
       el("import-status").textContent=`导入完成：${result.frame_count}张，请选择图片编辑或直接导出训练版本。`;
-    } finally {el("import").inert=false;}
+    } finally {lockEditor(false);}
   });
   function paint(p, previous = p) {
     const radius = Math.max(1, Math.min(256, Number(el("brush").value) || 12)) / 2;
@@ -141,7 +152,8 @@
     }
   }
   canvas.onpointerdown = event => {
-    if (!annotation || busy || event.button !== 0) return; event.preventDefault(); canvas.focus(); canvas.setPointerCapture(event.pointerId);
+    // 获得快捷键焦点时不能让浏览器滚动画布，否则首个顶点会用变化后的矩形算坐标。
+    if (!annotation || busy || event.button !== 0) return; event.preventDefault(); canvas.focus({preventScroll:true}); canvas.setPointerCapture(event.pointerId);
     const p = position(event), tool = el("tool").value;
     if (tool === "pan") { drag = {type:"pan", start:[event.clientX, event.clientY], offset:[...offset]}; return; }
     if (tool === "polygon") { polygon.push(p); redraw(); return; }
@@ -205,8 +217,8 @@
     const payload={revision:annotation.revision};
     if(mask) { const runs=[]; let start=0; for(let i=1;i<=mask.length;i++) if(i===mask.length || mask[i]!==mask[start]) { runs.push(mask[start],i-start); start=i; } payload.mask_rle=runs; }
     else payload.objects=objects;
-    busy=true; document.querySelector("main").inert=true;
-    try { const saved=await parseApiResponse(await fetch(endpoint(),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})); annotation.revision=saved.revision; dirty=false; redraw(); showToast("标注已保存"); } finally {busy=false; document.querySelector("main").inert=false;}
+    lockEditor(true);
+    try { const saved=await parseApiResponse(await fetch(endpoint(),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})); annotation.revision=saved.revision; dirty=false; redraw(); showToast("标注已保存"); } finally {lockEditor(false);}
   });
   el("export").onclick = attempt(async () => {
     if(!spec) throw Error("请选择标注集"); if(dirty || polygon.length) throw Error("请先保存当前编辑，再导出标注集");

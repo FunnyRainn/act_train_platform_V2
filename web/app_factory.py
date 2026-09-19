@@ -10,7 +10,7 @@ from web.context import AppContext, set_context
 from web.routes import annotation, bootstrap, catalog, datasets, media, packages, pages, training
 from web.routes import task_annotations
 
-VERSION = "V2.4.0.3"
+VERSION = "V2.4.0.4"
 
 
 def create_app() -> FastAPI:
