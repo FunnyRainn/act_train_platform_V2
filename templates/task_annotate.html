@@ -16,6 +16,16 @@
     <button type="submit">创建标注集</button><span>使用当前项目标签快照；任务创建后固定。</span>
   </form>
 </details>
+<details class="ta-panel"><summary>导入已有 YOLO 标注</summary>
+  <p>选择上方项目。目录使用 images/train、images/val 与 labels 或 masks；names 对应项目标签编码。语义背景名 __background__、忽略值255。导入保留原目录，复制所选图片一次并创建可编辑标注集。</p>
+  <form id="ta-import" class="ta-controls">
+    <label>导入名称<input id="ta-import-name" required value="导入标注集"></label>
+    <label>导入任务<select id="ta-import-task"><option value="detect">目标检测</option><option value="instance_segment">实例分割</option><option value="semantic_segment">语义分割</option></select></label>
+    <label>服务器数据集绝对目录<input id="ta-import-path" required placeholder="数据集所在目录"></label>
+    <button id="ta-inspect" type="button">只读预检</button><button type="submit">导入为标注集</button>
+    <span id="ta-import-status" role="status">先预检任务与标签映射。</span>
+  </form>
+</details>
 <section class="ta-panel">
   <div class="ta-controls" id="ta-tools">
     <label>工具<select id="ta-tool"></select></label>

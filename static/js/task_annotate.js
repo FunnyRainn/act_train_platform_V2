@@ -115,6 +115,22 @@
     const created = await apiPost("/api/annotation-sets", {project_id: el("project").value, name: el("name").value, task_type: el("task").value});
     sets.push(created); selectOptions("set", sets, row => `${row.name} · ${names[row.task_type]}`); el("set").value = created.id; configure(); await loadFrame();
   });
+  const importPayload = () => ({project_id:el("project").value,name:el("import-name").value,task_type:el("import-task").value,source_dir:el("import-path").value.trim()});
+  el("inspect").onclick = attempt(async () => {
+    if(!el("project").value) throw Error("请先选择项目");
+    const result=await apiPost("/api/task-datasets/inspect",importPayload());
+    el("import-status").textContent=`预检通过：${names[result.task_type]}，${result.frame_count}张，标签${result.label_codes.join("、")}；原目录不修改。`;
+  });
+  el("import").onsubmit = attempt(async event => {
+    event.preventDefault(); if(!el("project").value) throw Error("请先选择项目"); if(!canLeave()) return;
+    el("import").inert=true;
+    try {
+      const result=await apiPost("/api/task-datasets/import",importPayload());
+      await loadProject(); el("set").value=result.annotation_set.id; configure(); el("frameset").value=result.frame_set_id;
+      selectOptions("frame",await apiGet(`/api/frame-sets/${result.frame_set_id}/frames`),row=>`${row.frame_index} · ${row.width}×${row.height}`);
+      el("import-status").textContent=`导入完成：${result.frame_count}张，请选择图片编辑或直接导出训练版本。`;
+    } finally {el("import").inert=false;}
+  });
   function paint(p, previous = p) {
     const radius = Math.max(1, Math.min(256, Number(el("brush").value) || 12)) / 2;
     const value = el("tool").value === "erase" ? 255 : el("tool").value === "background" ? 0 : spec.label_codes.indexOf(el("label").value) + 1;

@@ -9,7 +9,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from core import db, task_annotations as annotations, task_dataset
+from core import db, task_annotations as annotations, task_dataset, task_importer
 from web.app_factory import create_app
 
 
@@ -19,6 +19,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.sqlite3")
     monkeypatch.setattr(db, "ensure_runtime_dirs", lambda: None)
     monkeypatch.setattr(task_dataset, "DATASETS_DIR", tmp_path / "datasets")
+    monkeypatch.setattr(task_importer, "FRAMES_DIR", tmp_path / "imported_frames")
     schema = Path(db.__file__).with_name("schema.sql").read_text(encoding="utf-8")
     old_schema = schema[schema.index("CREATE TABLE IF NOT EXISTS labels"):]
     with db.get_conn() as conn:
@@ -126,3 +127,49 @@ def test_crop_boundary_and_mismatch(client):
 def test_editor_page_is_real_route(client):
     response = client.get("/task-annotate")
     assert response.status_code == 200 and "ta-canvas" in response.text
+
+
+@pytest.mark.parametrize("task", ["detect","instance_segment","semantic_segment"])
+def test_yolo_import_export_roundtrip(client,task):
+    set_id=make_set(client,task)
+    for i in range(2):
+        payload={"revision":0,"mask_rle":[255,96,0,900,1,540]} if task=="semantic_segment" else object_payload(task)
+        assert client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=payload).status_code==200
+    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={}).json()
+    source=Path(exported["output_dir"])
+    # 记录全部源文件内容哈希，导入不得覆盖、转换或重写来源。
+    import hashlib
+    before={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in source.rglob("*") if p.is_file()}
+    request={"project_id":"p","name":"导入","task_type":task,"source_dir":str(source)}
+    preview=client.post("/api/task-datasets/inspect",json=request)
+    assert preview.status_code==200 and preview.json()["frame_count"]==2
+    imported=client.post("/api/task-datasets/import",json=request)
+    assert imported.status_code==200,imported.text
+    result=imported.json(); imported_id=result["annotation_set"]["id"]
+    frames=client.get(f"/api/frame-sets/{result['frame_set_id']}/frames").json()
+    assert len(frames)==2
+    for frame in frames:
+        raw=client.get(f"/api/annotation-sets/{imported_id}/frames/{frame['id']}").json()
+        if task=="semantic_segment": assert raw["mask_rle"]==payload["mask_rle"]
+        else:
+            saved=raw["objects"][0]
+            expected=payload["objects"][0]
+            assert saved["label_code"]==expected["label_code"]
+            assert np.allclose(saved.get("bbox",saved.get("polygons")),expected.get("bbox",expected.get("polygons")))
+    reexport=client.post(f"/api/annotation-sets/{imported_id}/export",json={})
+    assert reexport.status_code==200
+    assert reexport.json()["metadata"]["split_policy"]=="preserved_import_source"
+    assert reexport.json()["summary"]["train_count"]==1
+    assert reexport.json()["summary"]["val_count"]==1
+    after={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in source.rglob("*") if p.is_file()}
+    assert before==after
+
+
+def test_import_traversal_and_task_mismatch(client,tmp_path):
+    set_id=make_set(client,"instance_segment")
+    for i in range(2): client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=object_payload("instance_segment"))
+    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={}).json()
+    request={"project_id":"p","name":"禁止混用","task_type":"detect","source_dir":exported["output_dir"]}
+    assert client.post("/api/task-datasets/inspect",json=request).status_code==400
+    with pytest.raises(ValueError): task_importer.local_child(tmp_path.resolve(),"../escape")
+    with pytest.raises(ValueError): task_importer.local_child(tmp_path.resolve(),"C:\\private\\mask.png")

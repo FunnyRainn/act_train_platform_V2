@@ -106,9 +106,18 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> di
     labels = (["__background__"] if spec["task_type"] == "semantic_segment" else []) + spec["label_codes"]
     ordered = sorted(prepared, key=lambda row: hashlib.sha256(row[0]["id"].encode()).hexdigest())
     val_count = max(1, round(len(ordered) * .2))
+    source_splits = {}
+    for frame_set_id in {row[0]["frame_set_id"] for row in prepared}:
+        frame_set = store.get_frame_set(frame_set_id)
+        source_splits.update(frame_set.get("config", {}).get("source_splits", {}))
+    # 只要导入集声明拆分，就必须完整保留；混合未声明帧时拒绝隐式重新分配。
+    if source_splits and any(row[0]["id"] not in source_splits for row in prepared):
+        raise ValueError("当前集合混合了有来源拆分和无拆分的帧，请分开导出")
+    if source_splits and not {"train", "val"} <= {source_splits[row[0]["id"]] for row in prepared}:
+        raise ValueError("保留来源拆分的导出必须同时包含train和val，不能自动移动样本")
     index = []
     for number, (frame, source, bounds, mask_png, lines, frame_revision) in enumerate(ordered):
-        split = "val" if number < val_count else "train"
+        split = source_splits[frame["id"]] if source_splits else ("val" if number < val_count else "train")
         image_dir = output / "images" / split
         label_dir = output / ("masks" if mask_png is not None else "labels") / split
         image_dir.mkdir(parents=True, exist_ok=True)
@@ -125,6 +134,8 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> di
             (label_dir / f"{frame['id']}.txt").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
         index.append({"frame_id": frame["id"], "annotation_revision": frame_revision, "split": split, "original_hw": [frame["height"], frame["width"]], "crop_xyxy": list(bounds)})
     config = {"path": str(output), "train": "images/train", "val": "images/val", "names": dict(enumerate(labels)), "task_type": spec["task_type"]}
+    if any(row["split"] == "test" for row in index):
+        config["test"] = "images/test"
     if spec["task_type"] == "semantic_segment":
         config["masks_dir"] = "masks"
     (output / "dataset.generated.yaml").write_text(yaml.safe_dump(config, allow_unicode=True), encoding="utf-8")
@@ -132,4 +143,7 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> di
     metadata = {"task_type": spec["task_type"], "annotation_set_id": set_id, "annotation_revision": revision, "background_id": 0 if spec["task_type"] == "semantic_segment" else None, "ignore_id": 255 if spec["task_type"] == "semantic_segment" else None, "image_scope": "focus_region_crop" if focus else "full_image", "recommended_imgsz": 640, "crop_polygon_precision": "one_pixel" if focus and spec["task_type"] == "instance_segment" else "original", "split_policy": "deterministic_frame_hash_not_accuracy_benchmark"}
     if focus:
         metadata.update(focus_region_id=focus["id"], focus_region_name=focus["name"], focus_region_rect_norm=rect)
-    return store.save_dataset_version({"id": dataset_id, "project_id": spec["project_id"], "name": name or spec["name"], "output_dir": output, "label_codes": labels, "frame_set_ids": sorted({row[0]["frame_set_id"] for row in prepared}), "summary": {"frame_count": len(rows), "train_count": len(rows)-val_count, "val_count": val_count, "task_type": spec["task_type"]}, "metadata": metadata, "status": "ready"})
+    if source_splits:
+        metadata["split_policy"] = "preserved_import_source"
+    counts = {f"{split}_count": sum(row["split"] == split for row in index) for split in ("train", "val", "test")}
+    return store.save_dataset_version({"id": dataset_id, "project_id": spec["project_id"], "name": name or spec["name"], "output_dir": output, "label_codes": labels, "frame_set_ids": sorted({row[0]["frame_set_id"] for row in prepared}), "summary": {"frame_count": len(rows), **counts, "task_type": spec["task_type"]}, "metadata": metadata, "status": "ready"})
