@@ -24,6 +24,7 @@
       <label>训练设备<input name="device" value="0"></label>
     </div>
     <div id="imgsz-recommendation" class="row-meta">输入尺寸默认按训练数据集图片尺寸自动推荐；Windows GPU 使用 0，Apple Silicon 使用 mps，CPU 使用 cpu。</div>
+    <div class="row-meta">训练设备需明确选择：Windows/Ubuntu NVIDIA 使用 0，Apple Silicon 使用 mps，CPU 使用 cpu。Mac 无 NVIDIA 显卡监测不代表 MPS 训练失败。</div>
     <button class="primary" type="submit">启动训练</button>
   </form>
   <section class="panel">

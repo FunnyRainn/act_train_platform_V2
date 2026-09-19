@@ -7,11 +7,12 @@ async function refreshPackages() {
     const focus = pkg.train_job_id === focusJob ? " selected" : "";
     const meta = pkg.metadata || {};
     const labels = (meta.label_codes || []).join(", ") || "-";
+    const task = {detect:"目标检测",instance_segment:"实例分割",semantic_segment:"语义分割"}[meta.task_contract?.task_type || "detect"];
     return `<div class="row${focus}">
       <div>
         <div class="row-title">${esc(pkg.name)}</div>
         <div class="row-meta">
-          状态: ${esc(pkg.status)} | 来源训练任务: ${esc(pkg.train_job_id)} | 标签: ${esc(labels)}<br>
+          任务: ${esc(task)} | 状态: ${esc(pkg.status)} | 来源训练任务: ${esc(pkg.train_job_id)} | 标签: ${esc(labels)}<br>
           模型目录: ${esc(pkg.package_dir)}
         </div>
       </div>
