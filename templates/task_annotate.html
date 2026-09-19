@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}三任务标注工作台{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/task_annotate.css">
+<header><h1>三任务标注工作台</h1><p>素材共用，任务独立。原始标注保留，导出生成新的数据集版本。</p></header>
+<section class="ta-panel ta-controls">
+  <label>产品项目<select id="ta-project"></select></label>
+  <label>标注集<select id="ta-set"></select></label>
+  <label>帧集<select id="ta-frameset"></select></label>
+  <label>图片<select id="ta-frame"></select></label>
+</section>
+<details class="ta-panel"><summary>新建任务标注集</summary>
+  <form id="ta-create" class="ta-controls">
+    <label>名称<input id="ta-name" required maxlength="120" placeholder="例如：扎带实例标注"></label>
+    <label>任务<select id="ta-task"><option value="detect">目标检测</option><option value="instance_segment">实例分割</option><option value="semantic_segment">语义分割</option></select></label>
+    <button type="submit">创建标注集</button><span>使用当前项目标签快照；任务创建后固定。</span>
+  </form>
+</details>
+<section class="ta-panel">
+  <div class="ta-controls" id="ta-tools">
+    <label>工具<select id="ta-tool"></select></label>
+    <label>类别<select id="ta-label"></select></label>
+    <label>画笔直径（原图像素）<input id="ta-brush" type="number" min="1" max="256" value="12"></label>
+    <button id="ta-finish" type="button">完成多边形 ↵</button>
+    <button id="ta-fragment" type="button">给选中实例添加片段</button>
+    <button id="ta-delete" type="button">删除选中实例</button>
+  </div>
+  <div class="ta-controls">
+    <button id="ta-undo" type="button">撤销</button><button id="ta-redo" type="button">重做</button>
+    <button id="ta-fit" type="button">适应画布</button>
+    <label>缩放<input id="ta-zoom" type="range" min="10" max="400" value="100"></label>
+    <button id="ta-save" type="button" class="primary">保存标注</button>
+    <span id="ta-status" role="status" aria-live="polite">请选择项目、标注集和图片</span>
+  </div>
+  <div class="ta-workspace">
+    <div id="ta-viewport"><canvas id="ta-canvas" aria-label="标注画布" tabindex="0"></canvas><p id="ta-empty">选择图片后开始标注</p></div>
+    <aside><h3>实例与操作</h3><div id="ta-instances"></div><p id="ta-help">多边形逐点单击，Enter 完成；Esc 取消。选择工具可拖动顶点。平移工具拖动画面。</p><p>语义未标注区域显示灰色，默认忽略255；背景0必须明确绘制。撤销历史最多20步且有内存上限。</p></aside>
+  </div>
+</section>
+<section class="ta-panel ta-controls">
+  <label>关注区域<select id="ta-focus"><option value="">原图完整范围</option></select></label>
+  <button id="ta-export" type="button">导出当前标注集</button>
+  <a href="/datasets">查看数据集</a><a href="/training">进入训练</a>
+  <span>至少保存两帧。多片段实例无法无损导出时会明确拒绝。</span>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/js/task_annotate.js"></script>{% endblock %}

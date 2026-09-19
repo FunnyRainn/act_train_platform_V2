@@ -1,8 +1,26 @@
-const SERIES_DEFS = [
+const DETECT_SERIES = [
   { id: "train_loss", label: "训练误差", color: "#2866d6", keys: ["train/box_loss", "box_loss"] },
   { id: "val_loss", label: "验证误差", color: "#e07a2f", keys: ["val/box_loss"] },
   { id: "score", label: "综合评分", color: "#197a4b", keys: ["metrics/mAP50(B)", "metrics/mAP50"] },
 ];
+
+// 每种任务展示自身的质量指标，不能把检测框mAP标为分割综合评分。
+function seriesDefs(task = "detect") {
+  if (task === "semantic_segment") return [
+    {label:"训练交叉熵",color:"#2866d6",keys:["train/ce_loss"]},
+    {label:"验证交叉熵",color:"#e07a2f",keys:["val/ce_loss"]},
+    {label:"类别区域 mIoU",color:"#197a4b",keys:["metrics/mIoU"]},
+    {label:"像素准确率",color:"#a24aa4",keys:["metrics/pixel_acc"]},
+  ];
+  if (task === "instance_segment") return [
+    {label:"训练mask误差",color:"#2866d6",keys:["train/seg_loss"]},
+    {label:"验证mask误差",color:"#e07a2f",keys:["val/seg_loss"]},
+    {label:"实例mask mAP50",color:"#197a4b",keys:["metrics/mAP50(M)"]},
+    {label:"检测框 mAP50",color:"#a24aa4",keys:["metrics/mAP50(B)"]},
+  ];
+  return DETECT_SERIES;
+}
+const TASK_LABELS = {detect:"目标检测",instance_segment:"实例分割",semantic_segment:"语义分割"};
 
 function metricValue(row, candidates) {
   for (const key of candidates) {
@@ -11,7 +29,7 @@ function metricValue(row, candidates) {
   return null;
 }
 
-function drawChart(canvas, rows) {
+function drawChart(canvas, rows, task) {
   const ctx = canvas.getContext("2d");
   const width = canvas.width = canvas.clientWidth;
   const height = canvas.height = canvas.clientHeight;
@@ -25,7 +43,7 @@ function drawChart(canvas, rows) {
     ctx.lineTo(width, y);
     ctx.stroke();
   }
-  for (const def of SERIES_DEFS) {
+  for (const def of seriesDefs(task)) {
     const points = rows.map((row, idx) => ({ idx, value: metricValue(row, def.keys) })).filter(p => Number.isFinite(p.value));
     if (points.length < 2) continue;
     const min = Math.min(...points.map(p => p.value));
@@ -47,7 +65,7 @@ let trainingStatusRefreshInFlight = false;
 
 function fillTrainSelects(data) {
   fillSelect($("#train-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
-  fillSelect($("#train-form select[name=dataset_version_id]"), data.datasets, item => item.id, item => `${item.name} (${item.status})`, "选择训练数据集");
+  fillSelect($("#train-form select[name=dataset_version_id]"), data.datasets, item => item.id, item => `${item.name} · ${TASK_LABELS[item.metadata?.task_type || "detect"]} (${item.status})`, "选择训练数据集");
   updateImgSizeRecommendation(data.datasets);
 }
 
@@ -68,6 +86,9 @@ function updateImgSizeRecommendation(datasets) {
   const hint = $("#imgsz-recommendation");
   if (!form || !hint) return;
   const dataset = (datasets || []).find(item => item.id === form.dataset_version_id.value);
+  if (dataset) form.project_id.value = dataset.project_id;
+  const task = dataset?.metadata?.task_type || "detect";
+  $("#train-task-hint").textContent = dataset ? `任务固定为${TASK_LABELS[task]}；默认YOLO26对应任务基础模型，不能混用。` : "请选择数据集，任务类型由数据集决定。";
   const recommended = datasetRecommendedImgsz(dataset);
   const stats = dataset?.metadata?.image_size_stats || dataset?.summary?.image_size_stats || {};
   if (recommended) {
@@ -119,7 +140,9 @@ function renderTrainJobs(trainJobs) {
         <div class="progress-shell"><div class="progress-fill" style="width:${Number(p.percent || 0)}%"></div></div>
         <div class="row-meta">${packageText}</div>
         ${hint ? `<div class="row-meta">${esc(hint)}</div>` : ""}
-        <div class="chart-legend">${SERIES_DEFS.map(def => `<span><i style="background:${def.color}"></i>${def.label}</span>`).join("")}</div>
+        <div class="row-meta">任务：${esc(TASK_LABELS[job.params?.task_type || "detect"])}</div>
+        <div class="chart-legend">${seriesDefs(job.params?.task_type).map(def => `<span><i style="background:${def.color}"></i>${def.label}</span>`).join("")}</div>
+        <div class="row-meta">${seriesDefs(job.params?.task_type).map(def => `${def.label}: ${metricValue(p.last_metrics || {}, def.keys) ?? "待训练"}`).join(" · ")}</div>
         <canvas class="chart" data-job="${esc(job.id)}"></canvas>
       `,
       `
@@ -130,7 +153,7 @@ function renderTrainJobs(trainJobs) {
   }).join("");
   for (const job of trainJobs) {
     const canvas = document.querySelector(`canvas[data-job="${job.id}"]`);
-    if (canvas) drawChart(canvas, job.progress?.series || []);
+    if (canvas) drawChart(canvas, job.progress?.series || [], job.params?.task_type);
   }
   $$("[data-stop]").forEach(btn => {
     btn.onclick = async () => {

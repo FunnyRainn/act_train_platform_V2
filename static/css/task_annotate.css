@@ -1,0 +1,16 @@
+/* 沿用主站颜色、边框和字体；画布固定视口内变换，避免放大后撑破布局。 */
+.ta-panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin:14px 0}
+.ta-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:12px}
+.ta-controls label{display:flex;flex-direction:column;gap:5px;font-size:13px;min-width:120px}
+.ta-controls select,.ta-controls input:not([type=range]){min-height:36px;max-width:230px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px}
+.ta-controls span{font-size:13px;color:var(--muted);align-self:center}
+.ta-workspace{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px}
+#ta-viewport{position:relative;height:520px;overflow:hidden;background:#18212d;border-radius:8px;touch-action:none}
+#ta-canvas{position:absolute;top:0;left:0;transform-origin:0 0;touch-action:none;max-width:none}
+#ta-empty{color:#dbe4f2;text-align:center;padding-top:200px;pointer-events:none}
+#ta-instances{max-height:300px;overflow:auto;display:grid;gap:6px}
+#ta-instances button{text-align:left;overflow-wrap:anywhere}
+#ta-instances button.selected{border-color:var(--primary);background:var(--bg)}
+.ta-workspace aside p{font-size:12px;color:var(--muted);line-height:1.7}
+#ta-status[data-dirty=true]{color:var(--danger)}
+@media(max-width:1000px){.ta-workspace{grid-template-columns:1fr}.ta-workspace aside{display:block}#ta-viewport{height:430px}}

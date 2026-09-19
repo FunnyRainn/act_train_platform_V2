@@ -1,3 +1,23 @@
+-- V2.4新增表独立于旧矩形标注，重跑schema幂等，不重写历史数据。
+CREATE TABLE IF NOT EXISTS task_annotation_sets (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    task_type TEXT NOT NULL CHECK(task_type IN ('detect','instance_segment','semantic_segment')),
+    labels_json TEXT NOT NULL,
+    revision INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS task_frame_annotations (
+    set_id TEXT NOT NULL REFERENCES task_annotation_sets(id) ON DELETE CASCADE,
+    frame_id TEXT NOT NULL REFERENCES frames(id) ON DELETE CASCADE,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    mask_png BLOB,
+    revision INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(set_id,frame_id)
+);
+
 CREATE TABLE IF NOT EXISTS labels (
     code TEXT PRIMARY KEY,
     group_code TEXT NOT NULL CHECK(group_code IN ('A','B','C')),

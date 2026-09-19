@@ -8,6 +8,12 @@ from web.context import page
 router = APIRouter()
 
 
+@router.get("/task-annotate", response_class=HTMLResponse)
+def task_annotate_page(request: Request) -> HTMLResponse:
+    """统一任务标注入口；旧矩形工作台保留，不自动迁移旧标注。"""
+    return page(request, "task_annotate.html", page_id="task_annotate")
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     """用途：说明 Web 路由、请求校验和页面 API 中 `index` 的职责和调用边界。

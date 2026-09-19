@@ -8,8 +8,9 @@ from core.db import init_db
 from core.paths import PROJECT_ROOT
 from web.context import AppContext, set_context
 from web.routes import annotation, bootstrap, catalog, datasets, media, packages, pages, training
+from web.routes import task_annotations
 
-VERSION = "V2.4.0.1"
+VERSION = "V2.4.0.2"
 
 
 def create_app() -> FastAPI:
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog.router)
     app.include_router(media.router)
     app.include_router(annotation.router)
+    app.include_router(task_annotations.router)
     app.include_router(datasets.router)
     app.include_router(training.router)
     app.include_router(packages.router)

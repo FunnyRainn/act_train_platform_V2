@@ -226,8 +226,10 @@ def _remap_label_file(src_label: Path, dst_label: Path, history_label_codes: lis
     lines: list[str] = []
     for raw in src_label.read_text(encoding="utf-8").splitlines():
         parts = raw.strip().split()
-        if len(parts) < 5:
+        if not parts:
             continue
+        if len(parts) != 5:
+            raise ValueError(f"历史检测数据集标签必须为5列，不能混入分割多边形: {src_label}")
         old_class_id = int(float(parts[0]))
         if old_class_id >= len(history_label_codes):
             continue
@@ -314,6 +316,8 @@ def _validate_history_scope(history_dataset: dict, image_scope: str, focus_regio
     """
 
     warnings: list[str] = []
+    if (history_dataset.get("metadata") or {}).get("task_type", "detect") != "detect":
+        raise ValueError("旧矩形导出不能混入分割数据集；请使用对应任务标注集导出")
     history_scope, history_region_id = _dataset_scope(history_dataset)
     if history_scope != image_scope or history_region_id != focus_region_id:
         message = f"历史数据集 {history_dataset['name']} 的视野({history_scope}/{history_region_id or '-'})与当前导出({image_scope}/{focus_region_id or '-'})不同"
