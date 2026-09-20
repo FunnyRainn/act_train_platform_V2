@@ -153,6 +153,23 @@ def test_editor_page_is_real_route(client):
     assert response.status_code == 200 and "ta-canvas" in response.text
 
 
+def test_raw_images_do_not_create_fake_annotations(client, tmp_path):
+    payload = {"project_id": "p", "name": "只导入原图", "images": [
+        {"path": str(tmp_path / f"{i}.png"), "source_group": f"clip-{i}", "split": split}
+        for i, split in enumerate(("train", "val", "test"))]}
+    response = client.post("/api/frame-sets/import-images", json=payload)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert client.post("/api/frame-sets/import-images", json=payload).json()["frame_set_id"] == result["frame_set_id"]
+    frames = client.get(f"/api/frame-sets/{result['frame_set_id']}/frames").json()
+    assert len(frames) == 3
+    for task in ("detect", "instance_segment", "semantic_segment"):
+        set_id = make_set(client, task)
+        assert client.get(f"/api/annotation-sets/{set_id}/frames/{frames[0]['id']}").json()["revision"] == 0
+    payload["images"][1]["source_group"] = "clip-0"
+    assert client.post("/api/frame-sets/import-images", json=payload).status_code == 400
+
+
 @pytest.mark.parametrize("task", ["detect","instance_segment","semantic_segment"])
 def test_yolo_import_export_roundtrip(client,task):
     set_id=make_set(client,task)

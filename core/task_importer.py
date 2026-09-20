@@ -135,3 +135,60 @@ def import_set(project_id: str, name: str, task: str, source_dir: str) -> dict:
         # 拆分是数据来源的一部分；后续导出优先保留，不能自动把测试图放进训练集。
         conn.execute("UPDATE frame_sets SET config_json=? WHERE id=?",(json.dumps({"source_type":"yolo_import","task_type":task,"source_splits":source_splits}),frame_set_id))
     return {"annotation_set":get_set(set_id),"frame_set_id":frame_set_id,"frame_count":len(prepared),"source_preserved":True}
+
+
+def import_unannotated_images(project_id: str, name: str, images: list[dict]) -> dict:
+    """只导入明确选中的原图一次，不把无标签误当负样本；三种标注集复用同一帧。
+
+    适用于已有小样本图片，避免为获取几帧复制整段历史视频。来源组与拆分必须显式提供。
+    """
+    store.get_project(project_id)
+    if not name.strip() or not isinstance(images, list) or not 1 <= len(images) <= 60:
+        raise ValueError("请输入帧集名称并选择1至60张图片")
+    prepared, groups, hashes = [], {}, set()
+    for item in images:
+        if set(item) != {"path", "source_group", "split"}:
+            raise ValueError("每张图片必须明确原路径、来源视频组和数据拆分")
+        source = Path(item["path"])
+        group, split = str(item["source_group"]).strip(), item["split"]
+        if not source.is_absolute() or not source.is_file() or source.suffix.lower() not in IMAGE_SUFFIXES:
+            raise ValueError("原图必须是服务器本机已有图片绝对路径")
+        if not group or len(group) > 200 or split not in {"train", "val", "test"}:
+            raise ValueError("原图来源组或拆分无效")
+        if group in groups and groups[group] != split:
+            raise ValueError("同一来源组不能跨数据拆分")
+        groups[group] = split
+        data = source.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        if sha in hashes:
+            raise ValueError("选中的原图含完全重复内容，请去重后导入")
+        hashes.add(sha)
+        image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+        if image is None or image.shape[0] * image.shape[1] > MAX_PIXELS:
+            raise ValueError(f"原图无法解码或超过像素上限: {source.name}")
+        prepared.append((source, sha, image.shape[1], image.shape[0], group, split))
+    # 相同样本清单重复提交幂等返回，避免网络重试制造平行帧集和素材副本。
+    identity = hashlib.sha256(json.dumps(sorted((sha, group, split) for _, sha, _, _, group, split in prepared)).encode()).hexdigest()
+    for frame_set in store.list_frame_sets(project_id):
+        if (frame_set.get("config") or {}).get("image_import_sha256") == identity:
+            return {"frame_set_id": frame_set["id"], "frame_count": frame_set["frame_count"], "source_preserved": True, "reused": True}
+    frame_set_id, video_id = new_id("frameset"), new_id("images")
+    destination = FRAMES_DIR / project_id / frame_set_id
+    destination.mkdir(parents=True, exist_ok=False)
+    config = {"source_type": "unannotated_images", "image_import_sha256": identity, "source_splits": {}, "source_groups": {}, "source_images": {}}
+    with get_conn() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("INSERT INTO videos(id,project_id,name,source_type,path,frame_count) VALUES(?,?,?,?,?,?)", (video_id,project_id,name,"image_dataset",str(destination),len(prepared)))
+        conn.execute("INSERT INTO frame_sets(id,project_id,video_id,name,output_dir,sample_every_n_frames,frame_count,status) VALUES(?,?,?,?,?,1,?,'ready')", (frame_set_id,project_id,video_id,name,str(destination),len(prepared)))
+        for index, (source, sha, width, height, group, split) in enumerate(prepared):
+            frame_id = new_id("frame")
+            target = destination / (frame_id + source.suffix.lower())
+            shutil.copy2(source, target)
+            if hashlib.sha256(target.read_bytes()).hexdigest() != sha:
+                raise ValueError("导入期间原图改变，数据库已回滚，请保持来源不变")
+            conn.execute("INSERT INTO frames(id,frame_set_id,video_id,frame_index,path,width,height) VALUES(?,?,?,?,?,?,?)", (frame_id,frame_set_id,video_id,index,str(target),width,height))
+            config["source_splits"][frame_id] = split
+            config["source_groups"][frame_id] = group
+            config["source_images"][frame_id] = {"path": str(source), "sha256": sha}
+        conn.execute("UPDATE frame_sets SET config_json=? WHERE id=?", (json.dumps(config, ensure_ascii=False), frame_set_id))
+    return {"frame_set_id": frame_set_id, "frame_count": len(prepared), "source_preserved": True, "reused": False}

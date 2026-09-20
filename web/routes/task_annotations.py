@@ -2,10 +2,20 @@
 from fastapi import APIRouter, Request
 from core import task_annotations as annotations
 from core.task_dataset import export_set
-from core.task_importer import import_set, inspect_source
+from core.task_importer import import_set, inspect_source, import_unannotated_images
 from web.context import api_error
 
 router = APIRouter()
+
+
+@router.post("/api/frame-sets/import-images")
+async def import_images(request: Request):
+    """受控的小样本原图入口；不导入旧框、不创建虚假空标注。"""
+    try:
+        payload = await request.json()
+        return import_unannotated_images(payload["project_id"], payload["name"], payload["images"])
+    except Exception as exc:
+        raise api_error(exc)
 
 
 @router.post("/api/task-datasets/inspect")
