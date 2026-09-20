@@ -3,15 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from starlette.concurrency import run_in_threadpool
 
 from core import training_ops, store
-from core.task_contract import task_type
+from core.task_contract import model_profile, task_type
+from core.model_profiles import prepare_model, profile_status
 from web.context import api_error
 
 router = APIRouter()
-
-DEFAULT_BASE_MODEL = "yolo11m.pt"
-
 
 def _resolve_base_model_path(raw_value: object, task: str = "detect") -> str:
     """用途：说明 Web 路由、请求校验和页面 API 中 `_resolve_base_model_path` 的职责和调用边界。
@@ -23,8 +22,7 @@ def _resolve_base_model_path(raw_value: object, task: str = "detect") -> str:
 
     raw = str(raw_value or "").strip()
     if not raw:
-        task_type(task)
-        return {"detect": "yolo26n.pt", "instance_segment": "yolo26n-seg.pt", "semantic_segment": "yolo26n-sem.pt"}[task]
+        raise ValueError("自定义模型路径不能为空；受管型号请使用型号选择")
     path = Path(raw)
     # 自定义预训练模型必须是服务端本机绝对路径，前端只负责传入字符串。
     if not path.is_absolute():
@@ -34,6 +32,28 @@ def _resolve_base_model_path(raw_value: object, task: str = "detect") -> str:
     if not path.is_file():
         raise FileNotFoundError(f"预训练模型文件不存在：{raw}")
     return str(path)
+
+
+@router.get("/api/model-profiles")
+def list_model_profiles(task: str | None = None) -> dict:
+    """仅返回面向用户的型号和准备状态，来源详情留在受管缓存收据。"""
+    try:
+        if task:
+            task_type(task)
+        return {"catalog_version": 1, "profiles": profile_status(task)}
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@router.post("/api/model-profiles/{profile_id}/prepare")
+def prepare_model_profile(profile_id: str, task: str) -> dict:
+    """可提前准备权重；下载失败保留具体原因，不替代所选型号。"""
+    try:
+        profile = model_profile(profile_id, task)
+        prepare_model(profile)
+        return {"profile_id": profile_id, "status": "ready"}
+    except Exception as exc:
+        raise api_error(exc)
 
 
 @router.get("/api/train-jobs")
@@ -59,13 +79,27 @@ async def create_train_job(request: Request) -> dict:
 
     try:
         payload = await request.json()
+        dataset = store.get_dataset_version(payload["dataset_version_id"])
+        if dataset["project_id"] != payload["project_id"]:
+            raise ValueError("训练数据集不属于当前项目")
+        task = (dataset.get("metadata") or {}).get("task_type", "detect")
+        params = dict(payload.get("params") or {})
+        if payload.get("base_model_path"):
+            if payload.get("model_profile_id"):
+                raise ValueError("自定义模型与受管型号不能同时指定")
+            base_path = _resolve_base_model_path(payload["base_model_path"], task)
+            params.update(model_name="PieCustom", model_profile_id=None)
+        else:
+            profile = model_profile(payload.get("model_profile_id"), task)
+            base_path = str(await run_in_threadpool(prepare_model, profile))
+            params.update(model_profile_id=profile["id"], model_name=profile["name"])
         # 路由层只做请求字段拆解和模型路径校验，训练任务状态由 core.training_ops 负责落库。
         return training_ops.create_train_job(
             payload["project_id"],
             payload["dataset_version_id"],
             payload.get("name") or "模型训练任务",
-            _resolve_base_model_path(payload.get("base_model_path"), (store.get_dataset_version(payload["dataset_version_id"]).get("metadata") or {}).get("task_type", "detect")),
-            payload.get("params") or {},
+            base_path,
+            params,
         )
     except Exception as exc:
         raise api_error(exc)

@@ -67,6 +67,6 @@ window.HELP_REGISTRY = {
   model_repo: {
     title: "模型仓库",
     body: "模型仓库保存历史训练出的可部署模型目录。复制整个目录到推理服务器后，配置服务读取该目录即可。",
-    example: "目录内包含 model_manifest.json、best.pt/last.pt、labels.yaml、训练报告和数据集记录。"
+    example: "目录内包含 model_manifest.json、型号_Best.pt / 型号_Last.pt、labels.yaml、训练报告和数据集记录；历史模型目录继续兼容。"
   }
 };

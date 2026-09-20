@@ -2,10 +2,24 @@
 from pathlib import Path
 import tempfile
 import unittest
-from core.task_contract import TaskContract, parse_manifest_contract, package_weight_path, require_capability, require_task_match
+from core.task_contract import MODEL_PROFILES, PIE_LAYOUTS, TaskContract, model_profile, parse_manifest_contract, package_weight_path, require_capability, require_task_match
 
 
 class TaskContractTests(unittest.TestCase):
+    def test_pie_catalog_and_versioned_contract(self):
+        """全部公开型号都能构造相应合同；通用语义与跨任务型号明确拒绝。"""
+        self.assertEqual(len(MODEL_PROFILES), 11)
+        for row in MODEL_PROFILES:
+            values = self.make(row["task_type"])
+            contract = TaskContract(**(values | {"contract_version": 2, "model_family": row["id"],
+                                                "output_layout": PIE_LAYOUTS[row["task_type"]]}))
+            self.assertEqual(contract.model_family, row["name"])
+            self.assertTrue(contract.backend_output_layout.startswith("ultralytics_"))
+        self.assertEqual(model_profile(None, "instance_segment")["id"], "PieV2S_Seg")
+        for profile, task in (("PieV1M_Sem", "semantic_segment"), ("PieV2S", "semantic_segment"), ("yolo26n", "detect")):
+            with self.assertRaises(ValueError):
+                model_profile(profile, task)
+
     def make(self, task="detect"):
         """构造最小显式合同，标签包含可区分的背景及对象。"""
         return dict(task_type=task, model_family="yolo26", model_version="test-sha", label_map={0:"background",1:"tie"}, input_hw=(64,64), output_layout={"detect":"ultralytics_boxes","instance_segment":"ultralytics_instances","semantic_segment":"semantic_class_map"}[task], **({"background_id":0,"ignore_id":255} if task=="semantic_segment" else {}))

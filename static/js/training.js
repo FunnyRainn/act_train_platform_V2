@@ -62,6 +62,23 @@ function drawChart(canvas, rows, task) {
 
 let trainingBootstrapData = null;
 let trainingStatusRefreshInFlight = false;
+let modelProfiles = [];
+
+// 型号列表由服务端共同目录提供，页面不自行构造模型文件名。
+function renderModelProfiles(task) {
+  const form = $("#train-form");
+  const old = form.model_profile_id.value;
+  const available = modelProfiles.filter(item => item.task_type === task);
+  fillSelect(form.model_profile_id, available, item => item.id, item => `${item.label} · ${item.name}`);
+  form.model_profile_id.value = available.some(item => item.id === old) ? old : (available.find(item => item.default)?.id || "");
+  updateModelStatus();
+}
+
+function updateModelStatus() {
+  const row = modelProfiles.find(item => item.id === $("#train-form").model_profile_id.value);
+  const labels = {not_prepared:"尚未准备，首次训练会下载",cached:"已缓存，使用前校验",ready:"已就绪",preparing:"准备中",failed:"准备失败"};
+  $("#model-profile-status").textContent = row ? `${row.name}：${labels[row.status] || row.status}${row.error ? ` · ${row.error}` : ""}` : "请选择可用型号";
+}
 
 function fillTrainSelects(data) {
   fillSelect($("#train-form select[name=project_id]"), data.projects, item => item.id, item => item.name, "选择产品");
@@ -88,7 +105,8 @@ function updateImgSizeRecommendation(datasets) {
   const dataset = (datasets || []).find(item => item.id === form.dataset_version_id.value);
   if (dataset) form.project_id.value = dataset.project_id;
   const task = dataset?.metadata?.task_type || "detect";
-  $("#train-task-hint").textContent = dataset ? `任务固定为${TASK_LABELS[task]}；默认YOLO26对应任务基础模型，不能混用。` : "请选择数据集，任务类型由数据集决定。";
+  $("#train-task-hint").textContent = dataset ? `任务固定为${TASK_LABELS[task]}；默认小模型，不同任务不能混用。` : "请选择数据集，任务类型由数据集决定。";
+  renderModelProfiles(task);
   const recommended = datasetRecommendedImgsz(dataset);
   const stats = dataset?.metadata?.image_size_stats || dataset?.summary?.image_size_stats || {};
   if (recommended) {
@@ -141,6 +159,9 @@ function renderTrainJobs(trainJobs) {
         <div class="row-meta">${packageText}</div>
         ${hint ? `<div class="row-meta">${esc(hint)}</div>` : ""}
         <div class="row-meta">任务：${esc(TASK_LABELS[job.params?.task_type || "detect"])}</div>
+        <div class="row-meta">型号：${esc(job.params?.model_name || "历史自定义模型")}</div>
+        ${job.status === "failed" ? `<div class="row-meta">${esc(job.log_text || "训练失败，请检查日志")}</div>` : ""}
+        ${job.model_package_error ? `<div class="row-meta">模型整理失败：${esc(job.model_package_error)}</div>` : ""}
         <div class="chart-legend">${seriesDefs(job.params?.task_type).map(def => `<span><i style="background:${def.color}"></i>${def.label}</span>`).join("")}</div>
         <div class="row-meta">${seriesDefs(job.params?.task_type).map(def => `${def.label}: ${metricValue(p.last_metrics || {}, def.keys) ?? "待训练"}`).join(" · ")}</div>
         <canvas class="chart" data-job="${esc(job.id)}"></canvas>
@@ -181,6 +202,7 @@ async function refreshTrainingStatus() {
 }
 
 async function initializeTrainingPage() {
+  modelProfiles = (await apiGet("/api/model-profiles")).profiles;
   trainingBootstrapData = await loadBootstrap();
   fillTrainSelects(trainingBootstrapData);
   renderTrainJobs(trainingBootstrapData.train_jobs || []);
@@ -197,14 +219,19 @@ async function renderGpuStatus() {
 $("#train-form").addEventListener("submit", async event => {
   event.preventDefault();
   const form = event.currentTarget;
+  const submit = form.querySelector("button[type=submit]");
+  submit.disabled = true;
   try {
+    $("#model-profile-status").textContent = "正在校验或准备模型；不会自动更换所选型号。";
     await apiPost("/api/train-jobs", {
       project_id: form.project_id.value,
       dataset_version_id: form.dataset_version_id.value,
       name: form.name.value,
       base_model_path: form.base_model_path.value.trim(),
+      model_profile_id: form.base_model_path.value.trim() ? null : form.model_profile_id.value,
       params: {
         epochs: Number(form.epochs.value),
+        patience: Number(form.patience.value),
         imgsz: form.imgsz.value ? Number(form.imgsz.value) : null,
         batch: Number(form.batch.value),
         device: form.device.value,
@@ -214,7 +241,28 @@ $("#train-form").addEventListener("submit", async event => {
     showToast("模型训练任务已创建，后台开始运行。");
     await refreshTrainingStatus();
   } catch (error) {
+    $("#model-profile-status").textContent = error.message;
     showToast(error.message, "error");
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+$("#train-form select[name=model_profile_id]").addEventListener("change", updateModelStatus);
+$("#prepare-model").addEventListener("click", async event => {
+  const row = modelProfiles.find(item => item.id === $("#train-form").model_profile_id.value);
+  if (!row) return;
+  event.currentTarget.disabled = true;
+  $("#model-profile-status").textContent = `${row.name}：准备中，请稍候`;
+  try {
+    await apiPost(`/api/model-profiles/${encodeURIComponent(row.id)}/prepare?task=${encodeURIComponent(row.task_type)}`, {});
+    modelProfiles = (await apiGet("/api/model-profiles")).profiles;
+    updateModelStatus();
+  } catch (error) {
+    $("#model-profile-status").textContent = error.message;
+    showToast(error.message, "error");
+  } finally {
+    $("#prepare-model").disabled = false;
   }
 });
 

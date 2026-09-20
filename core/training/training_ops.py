@@ -17,7 +17,8 @@ from core import store
 from core.paths import PACKAGES_DIR, PROJECT_ROOT, RUNS_DIR
 from core.runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
-from core.task_contract import TaskContract, require_task_match
+from core.task_contract import PIE_LAYOUTS, TaskContract, require_task_match
+from core.training.model_artifacts import artifact_paths
 
 
 WORKER_LOG_NAME = "worker.log"
@@ -224,13 +225,8 @@ def _available_model_files(job: dict) -> dict[str, str]:
     异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
     """
 
-    weights_dir = resolve_runtime_path(job["output_dir"], "训练输出目录") / "train" / "weights"
-    files: dict[str, str] = {}
-    for name in ["best.pt", "last.pt"]:
-        path = weights_dir / name
-        if path.exists():
-            files[name] = str(path)
-    return files
+    output_dir = resolve_runtime_path(job["output_dir"], "训练输出目录")
+    return {path.name: str(path) for path in artifact_paths(output_dir).values()}
 
 
 def _worker_log_exists(job: dict) -> bool:
@@ -421,7 +417,8 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
         return existing
     job = get_train_job_with_progress(train_job_id, auto_package=auto_package)
     model_files = job["progress"].get("model_files") or {}
-    selected = model_files.get("best.pt") or model_files.get("last.pt")
+    role_files = artifact_paths(resolve_runtime_path(job["output_dir"], "训练输出目录"))
+    selected = role_files.get("best") or role_files.get("last")
     if not selected:
         raise FileNotFoundError("当前训练任务没有可用模型文件，不能生成模型目录。")
     dataset = store.get_dataset_version(job["dataset_version_id"])
@@ -431,10 +428,9 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
     package_dir = PACKAGES_DIR / project["id"] / f"{package_id}_{safe_name(name)}"
     clean_dir(package_dir)
 
-    default_weight = "best.pt" if model_files.get("best.pt") else "last.pt"
-    shutil.copy2(selected, package_dir / default_weight)
-    if model_files.get("last.pt") and default_weight != "last.pt":
-        shutil.copy2(model_files["last.pt"], package_dir / "last.pt")
+    default_weight = selected.name
+    for path in role_files.values():
+        shutil.copy2(path, package_dir / path.name)
 
     label_rows = [label for label in store.list_labels() if label["code"] in dataset["label_codes"]]
     label_names = {idx: code for idx, code in enumerate(dataset["label_codes"])}
@@ -445,17 +441,22 @@ def export_model_package(train_job_id: str, name: str, auto_package: bool = True
     recommended_imgsz = int(dataset_metadata.get("recommended_imgsz") or job["params"].get("recommended_imgsz") or job["params"].get("imgsz") or 1280)
     trained_imgsz = int(job["params"].get("imgsz") or recommended_imgsz)
     task = require_task_match(dataset_metadata.get("task_type", "detect"), job["params"].get("task_type", "detect"))
+    brand = job["params"].get("model_name")
     contract = TaskContract(
-        task_type=task, model_family="yolo", model_version=hashlib.sha256(Path(selected).read_bytes()).hexdigest(),
+        contract_version=2 if brand else 1,
+        task_type=task, model_family=brand or "yolo", model_version=hashlib.sha256(Path(selected).read_bytes()).hexdigest(),
         label_map=label_names, input_hw=(trained_imgsz, trained_imgsz),
-        output_layout={"detect": "ultralytics_boxes", "instance_segment": "ultralytics_instances", "semantic_segment": "ultralytics_semantic"}[task],
+        output_layout=PIE_LAYOUTS[task] if brand else {"detect": "ultralytics_boxes", "instance_segment": "ultralytics_instances", "semantic_segment": "ultralytics_semantic"}[task],
         background_id=dataset_metadata.get("background_id") if task == "semantic_segment" else None,
         ignore_id=dataset_metadata.get("ignore_id") if task == "semantic_segment" else None,
     )
     manifest = {
         "task_type": task,
         "task_contract": contract.model_dump(mode="json"),
-        "schema_version": "1.0",
+        "schema_version": "2.0" if brand else "1.0",
+        "model_profile_id": job["params"].get("model_profile_id"),
+        "model_name": brand,
+        "artifacts": {role: {"path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for role, path in role_files.items()},
         "package_id": package_id,
         "package_name": name,
         "default_weight": default_weight,

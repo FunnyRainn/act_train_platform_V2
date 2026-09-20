@@ -20,6 +20,29 @@ OUTPUT_LAYOUTS = {
     "semantic_segment": {"ultralytics_semantic", "semantic_logits", "semantic_class_map"},
 }
 
+# 此目录是跨组件共享合同的一部分；Train派生下载来源，其余组件不维护第二套型号表。
+MODEL_PROFILES = tuple(
+    {"id": name + suffix, "name": name + suffix, "size": size, "label": label,
+     "task_type": task, "default": size == "small"}
+    for size, label, name in (("small", "小模型", "PieV2S"), ("medium", "中模型", "PieV2M"),
+                              ("large", "大模型", "PieV2L"), ("general", "通用模型", "PieV1M"))
+    for task, suffix in (("detect", ""), ("instance_segment", "_Seg"), ("semantic_segment", "_Sem"))
+    if not (size == "general" and task == "semantic_segment")
+)
+PIE_LAYOUTS = {"detect": "objects_v1", "instance_segment": "instances_v1", "semantic_segment": "class_map_v1"}
+PIE_BACKEND_LAYOUTS = {"objects_v1": "ultralytics_boxes", "instances_v1": "ultralytics_instances",
+                       "class_map_v1": "ultralytics_semantic"}
+
+
+def model_profile(profile_id: str | None, task: str) -> dict:
+    """稳定ID必须与数据集任务一致；省略时仅为新请求选择小模型。"""
+    task_type(task)
+    matches = [row for row in MODEL_PROFILES if row["task_type"] == task
+               and (row["id"] == profile_id if profile_id else row["default"])]
+    if len(matches) != 1:
+        raise ValueError("型号不存在或与数据集任务不匹配")
+    return dict(matches[0])
+
 
 def task_type(value: str) -> TaskType:
     """拒绝未知类型，不根据权重文件名猜测任务。"""
@@ -40,7 +63,7 @@ class TaskContract(BaseModel):
     """新包必须携带的可移植合同；不接受拼错字段或未知版本。"""
 
     model_config = ConfigDict(extra="forbid")
-    contract_version: Literal[1] = 1
+    contract_version: Literal[1, 2] = 1
     task_type: TaskType
     model_family: str = Field(min_length=1)
     model_version: str = Field(min_length=1)
@@ -53,13 +76,24 @@ class TaskContract(BaseModel):
     background_id: int | None = None
     ignore_id: int | None = None
 
+    @property
+    def backend_output_layout(self) -> str:
+        """内部适配时解析公开布局，不在包里泄漏第三方高层结果名称。"""
+        return PIE_BACKEND_LAYOUTS.get(self.output_layout, self.output_layout)
+
     @model_validator(mode="after")
     def validate_contract(self):
         """布局与任务一致；类别索引连续；语义背景和忽略不得混淆。"""
-        if not self.model_family.lower().startswith("yolo"):
-            raise ValueError("首版只支持YOLO模型家族")
-        if self.output_layout not in OUTPUT_LAYOUTS[self.task_type]:
-            raise ValueError("输出布局与任务不匹配")
+        if self.contract_version == 2:
+            if self.model_family != "PieCustom":
+                model_profile(self.model_family, self.task_type)
+            if self.output_layout != PIE_LAYOUTS[self.task_type]:
+                raise ValueError("Pie合同布局与任务不匹配")
+        else:
+            if not self.model_family.lower().startswith("yolo"):
+                raise ValueError("旧版合同模型家族不受支持")
+            if self.output_layout not in OUTPUT_LAYOUTS[self.task_type]:
+                raise ValueError("输出布局与任务不匹配")
         if not self.label_map or sorted(self.label_map) != list(range(len(self.label_map))):
             raise ValueError("类别映射必须是从0开始的连续索引")
         if any(not value.strip() for value in self.label_map.values()) or len(set(self.label_map.values())) != len(self.label_map):

@@ -14,11 +14,16 @@
     <label>训练数据集<select name="dataset_version_id"></select></label>
     <div id="train-task-hint" class="row-meta">请选择数据集，任务类型由数据集决定。</div>
     <label>任务名称<input name="name" value="模型训练任务"></label>
-    <div class="row-meta">基础模型由系统自动选择，客户无需配置。</div>
-    <label>预训练模型路径（可选）<input name="base_model_path" placeholder="E:\models\best.pt"></label>
-    <div class="row-meta">不填写时系统自动使用默认基础模型；填写时必须是训练服务所在机器上的绝对 .pt 文件路径。</div>
+    <label>基础模型型号<select name="model_profile_id" required></select></label>
+    <div id="model-profile-status" class="row-meta" aria-live="polite">选择任务后加载可用型号。</div>
+    <button type="button" id="prepare-model">准备所选模型</button>
+    <details><summary>高级：自定义本地模型</summary>
+      <label>预训练模型路径<input name="base_model_path" placeholder="E:\models\PieCustom.pt"></label>
+      <div class="row-meta">填写后覆盖型号选择；必须为服务端绝对 .pt 路径，实际任务须与数据集一致。</div>
+    </details>
     <div class="form-row">
       <label>训练轮数<input name="epochs" type="number" value="50"></label>
+      <label>提前停止耐心轮数<input name="patience" type="number" min="1" value="10"></label>
       <label>输入尺寸<input name="imgsz" type="number" placeholder="自动推荐"></label>
       <label>批次大小<input name="batch" type="number" value="8"></label>
       <label>训练设备<input name="device" value="0"></label>

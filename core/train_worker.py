@@ -11,6 +11,7 @@ from .db import json_dumps
 from .runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from .utils import now_text
 from .task_contract import ULTRALYTICS_TASKS, require_task_match
+from .training.model_artifacts import configure_artifacts
 
 
 def _worker_count(params: dict) -> int:
@@ -82,6 +83,10 @@ def run(job_id: str) -> None:
         task = require_task_match((dataset.get("metadata") or {}).get("task_type", "detect"), params.get("task_type", "detect"))
         if model.task != ULTRALYTICS_TASKS[task]:
             raise ValueError(f"基础模型任务{model.task}与数据集任务{task}不匹配")
+        # 新任务显式携带品牌名；历史任务不改名、不重新解释型号。
+        model_name = params.get("model_name")
+        if model_name:
+            model.add_callback("on_pretrain_routine_start", lambda trainer: configure_artifacts(trainer, output_dir, model_name))
         result = model.train(**train_kwargs)
         store.update_train_job(
             job_id,
