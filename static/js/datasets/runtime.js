@@ -5,7 +5,7 @@ function datasetSummaryText(summary) {
   const modeText = summary.export_mode === "annotated_only"
     ? "只导出已标注帧"
     : summary.export_mode === "external_yolo_import"
-      ? "外部 YOLO 导入"
+      ? "外部标注导入"
       : "已确认标注";
   const historyText = Number(summary.history_images || 0) > 0
     ? `历史混入: ${summary.history_images}张/${summary.history_boxes || 0}框`
@@ -212,7 +212,7 @@ async function inspectYoloDataset() {
   const form = $("#yolo-import-form");
   const payload = formToObject(form);
   if (!payload.project_id) throw new Error("请选择产品");
-  if (!payload.dataset_dir) throw new Error("请输入外部 YOLO 数据集目录");
+  if (!payload.dataset_dir) throw new Error("请输入外部标注数据集目录");
   yoloInspectResult = await apiPost("/api/datasets/import-yolo/inspect", {
     project_id: payload.project_id,
     dataset_dir: payload.dataset_dir,
@@ -221,7 +221,7 @@ async function inspectYoloDataset() {
   if ((yoloInspectResult.errors || []).length) {
     showToast(`解析完成，但发现 ${yoloInspectResult.errors.length} 个错误，请检查预览。`, "warn");
   } else {
-    showToast("外部 YOLO 数据集解析完成，请确认标签映射。");
+    showToast("外部标注数据集解析完成，请确认标签映射。");
   }
 }
 
@@ -238,7 +238,7 @@ async function importYoloDataset() {
   const payload = formToObject(form);
   if (!payload.project_id) throw new Error("请选择产品");
   if (!payload.name) throw new Error("请输入数据集名称");
-  if (!payload.dataset_dir) throw new Error("请输入外部 YOLO 数据集目录");
+  if (!payload.dataset_dir) throw new Error("请输入外部标注数据集目录");
   if (!yoloInspectResult || yoloInspectResult.dataset_dir !== payload.dataset_dir) {
     await inspectYoloDataset();
   }
