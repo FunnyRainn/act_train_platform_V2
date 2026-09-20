@@ -19,6 +19,7 @@ from core.runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from core.utils import clean_dir, new_id, now_text, safe_name
 from core.task_contract import PIE_LAYOUTS, TaskContract, require_task_match
 from core.training.model_artifacts import artifact_paths
+from core.training.parameters import advanced_training_kwargs
 
 
 WORKER_LOG_NAME = "worker.log"
@@ -35,6 +36,7 @@ def create_train_job(project_id: str, dataset_version_id: str, name: str, base_m
     dataset = store.get_dataset_version(dataset_version_id)
     repair_dataset_artifacts(dataset["output_dir"])
     params = dict(params or {})
+    params.update(advanced_training_kwargs(params))
     dataset_metadata = dataset.get("metadata") or {}
     if dataset["project_id"] != project_id:
         raise ValueError("训练数据集不属于当前项目")

@@ -12,6 +12,7 @@ from .runtime_paths import repair_dataset_artifacts, resolve_runtime_path
 from .utils import now_text
 from .task_contract import ULTRALYTICS_TASKS, require_task_match
 from .training.model_artifacts import configure_artifacts
+from .training.parameters import advanced_training_kwargs
 
 
 def _worker_count(params: dict) -> int:
@@ -77,6 +78,7 @@ def run(job_id: str) -> None:
             "val": True,
             "save": True,
         }
+        train_kwargs.update(advanced_training_kwargs(params))
         print(f"训练参数: {train_kwargs}", flush=True)
         model = YOLO(job["base_model_path"])
         # 读取模型本身的任务，不能根据文件名或用户声明强行把检测模型当分割。
