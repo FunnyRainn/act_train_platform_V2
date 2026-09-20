@@ -47,7 +47,7 @@ def create_set(project_id: str, name: str, task: str, labels: list[str] | None =
     if not codes or len(set(codes)) != len(codes) or any(code not in project["label_codes"] for code in codes):
         raise ValueError("请选择当前项目内不重复的有效标签")
     if task == "semantic_segment" and (len(codes) > 254 or "__background__" in codes):
-        raise ValueError("当前YOLO PNG导出支持最多254个前景类，背景0、忽略255保留")
+        raise ValueError("当前PNG类别图导出支持最多254个前景类，背景0、忽略255保留")
     if not name.strip():
         raise ValueError("标注集名称不能为空")
     set_id = new_id("annotation_set")

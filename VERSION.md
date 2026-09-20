@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`V2.4.0.9`
+`V2.4.0.10`
 
 ## Repository
 

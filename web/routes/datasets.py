@@ -76,7 +76,7 @@ async def import_yolo_dataset(request: Request) -> dict:
         payload = await request.json()
         return yolo_importer.import_yolo_dataset(
             payload["project_id"],
-            payload.get("name") or "外部YOLO数据集",
+            payload.get("name") or "外部标注数据集",
             payload["dataset_dir"],
             payload.get("label_mapping") or {},
             payload.get("image_scope") or "full_image",

@@ -48,7 +48,7 @@ def object_labels(spec: dict, objects: list[dict], width: int, height: int, boun
             coords = [(bx0 + bx1 - 2 * x0) / (2 * cw), (by0 + by1 - 2 * y0) / (2 * ch), (bx1 - bx0) / cw, (by1 - by0) / ch]
         else:
             if len(item["polygons"]) != 1:
-                raise ValueError(f"实例{item['instance_id']}有多个可见片段，当前YOLO单多边形格式不能无损表达；请调整导出选择，不会自动合并")
+                raise ValueError(f"实例{item['instance_id']}有多个可见片段，当前单多边形导出格式不能无损表达；请调整导出选择，不会自动合并")
             points = np.asarray(item["polygons"][0], np.float32)
             if bounds != (0, 0, width, height):
                 mask = np.zeros((height, width), np.uint8)

@@ -83,7 +83,7 @@ def inspect_source(project_id: str, task: str, source_dir: str) -> tuple[dict,li
         image_dir=local_child(root,value)
         if not image_dir.is_dir(): raise ValueError(f"拆分目录不存在: {split}")
         relative=image_dir.relative_to(root)
-        if not relative.parts or relative.parts[0]!="images": raise ValueError("图片目录需采用images/train、images/val等YOLO标准结构")
+        if not relative.parts or relative.parts[0]!="images": raise ValueError("图片目录需采用images/train、images/val等标准导入结构")
         label_dir=local_child(root,str(Path("labels",*relative.parts[1:])))
         mask_dir=local_child(root,str(Path(str(config.get("masks_dir") or "masks"),*relative.parts[1:])))
         for image_path in sorted(image_dir.rglob("*")):
