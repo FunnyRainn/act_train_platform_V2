@@ -67,7 +67,7 @@ def object_labels(spec: dict, objects: list[dict], width: int, height: int, boun
     return lines
 
 
-def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> dict:
+def export_set(set_id: str, name: str, focus_region_id: str | None = None, split_by_video: dict | None = None) -> dict:
     """先验证所有标注，再生成单一不可变导出版本；至少两帧避免训练验证同图。"""
     spec = get_set(set_id)
     focus = None
@@ -115,6 +115,36 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> di
         raise ValueError("当前集合混合了有来源拆分和无拆分的帧，请分开导出")
     if source_splits and not {"train", "val"} <= {source_splits[row[0]["id"]] for row in prepared}:
         raise ValueError("保留来源拆分的导出必须同时包含train和val，不能自动移动样本")
+    video_groups = {}
+    for frame, *_ in prepared:
+        video_groups.setdefault(frame["video_id"], []).append(frame["id"])
+    group_splits = {}
+    if split_by_video is not None:
+        if (not isinstance(split_by_video, dict) or set(split_by_video) != set(video_groups)
+                or not set(split_by_video.values()) <= {"train", "val", "test"}
+                or not {"train", "val"} <= set(split_by_video.values())):
+            raise ValueError("视频分组划分必须完整覆盖当前视频，且至少包含训练和验证组")
+        group_splits = split_by_video
+    elif not source_splits and len(video_groups) >= 2:
+        # 视频分组优先，样本量最大的来源作为训练；其余来源独立留出，不拆相邻帧。
+        groups = sorted(video_groups, key=lambda key: (-len(video_groups[key]), key))
+        group_splits = {key: "train" for key in groups}
+        group_splits[groups[-1]] = "val"
+        if len(groups) >= 3:
+            group_splits[groups[-2]] = "test"
+    if group_splits:
+        source_identities = {}
+        for video_id, split in group_splits.items():
+            video = store.get_video(video_id)
+            identity = str(video.get("asset_id") or Path(video["path"]).resolve())
+            if identity in source_identities and source_identities[identity] != split:
+                raise ValueError("同一来源视频不能跨训练、验证、测试组")
+            source_identities[identity] = split
+        for frame, *_ in prepared:
+            desired = group_splits[frame["video_id"]]
+            if frame["id"] in source_splits and source_splits[frame["id"]] != desired:
+                raise ValueError("视频分组与已导入来源划分冲突，不自动移动样本")
+            source_splits[frame["id"]] = desired
     index = []
     for number, (frame, source, bounds, mask_png, lines, frame_revision) in enumerate(ordered):
         split = source_splits[frame["id"]] if source_splits else ("val" if number < val_count else "train")
@@ -132,7 +162,7 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> di
                 raise OSError("类别mask写入失败")
         else:
             (label_dir / f"{frame['id']}.txt").write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
-        index.append({"frame_id": frame["id"], "annotation_revision": frame_revision, "split": split, "original_hw": [frame["height"], frame["width"]], "crop_xyxy": list(bounds)})
+        index.append({"frame_id": frame["id"], "video_id": frame["video_id"], "annotation_revision": frame_revision, "split": split, "original_hw": [frame["height"], frame["width"]], "crop_xyxy": list(bounds)})
     config = {"path": str(output), "train": "images/train", "val": "images/val", "names": dict(enumerate(labels)), "task_type": spec["task_type"]}
     if any(row["split"] == "test" for row in index):
         config["test"] = "images/test"
@@ -145,5 +175,7 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None) -> di
         metadata.update(focus_region_id=focus["id"], focus_region_name=focus["name"], focus_region_rect_norm=rect)
     if source_splits:
         metadata["split_policy"] = "preserved_import_source"
+    if group_splits:
+        metadata.update(split_policy="video_source_groups", split_by_video=group_splits)
     counts = {f"{split}_count": sum(row["split"] == split for row in index) for split in ("train", "val", "test")}
     return store.save_dataset_version({"id": dataset_id, "project_id": spec["project_id"], "name": name or spec["name"], "output_dir": output, "label_codes": labels, "frame_set_ids": sorted({row[0]["frame_set_id"] for row in prepared}), "summary": {"frame_count": len(rows), **counts, "task_type": spec["task_type"]}, "metadata": metadata, "status": "ready"})

@@ -104,6 +104,30 @@ def test_multifragment_preserved_and_export_refused(client):
     assert response.status_code == 400 and "one" in response.text
 
 
+def test_video_groups_preserve_test_split(client):
+    """三个真实来源分组不得按相邻帧随机拆分，显式覆盖必须完整且不冲突。"""
+    with db.get_conn() as conn:
+        for index in (1, 2):
+            conn.execute("INSERT INTO videos(id,project_id,name,source_type,path) VALUES(?,'p',?,'video',?)", (f"v{index}", f"clip{index}", f"clip{index}.mp4"))
+            conn.execute("UPDATE frames SET video_id=? WHERE id=?", (f"v{index}", f"f{index}"))
+    set_id = make_set(client, "detect")
+    for index in range(3):
+        assert client.put(f"/api/annotation-sets/{set_id}/frames/f{index}", json=object_payload("detect")).status_code == 200
+    splits = {"v": "train", "v1": "val", "v2": "test"}
+    response = client.post(f"/api/annotation-sets/{set_id}/export", json={"split_by_video": splits})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["metadata"]["split_policy"] == "video_source_groups"
+    index = json.loads((Path(result["output_dir"]) / "annotation_index.json").read_text())
+    assert {row["video_id"]: row["split"] for row in index} == splits
+    assert result["summary"]["test_count"] == 1
+    assert client.post(f"/api/annotation-sets/{set_id}/export", json={"split_by_video": {"v": "train"}}).status_code == 400
+    with db.get_conn() as conn:
+        conn.execute("UPDATE videos SET path='test' WHERE id='v1'")
+    conflict = client.post(f"/api/annotation-sets/{set_id}/export", json={"split_by_video": splits})
+    assert conflict.status_code == 400 and "同一来源" in conflict.text
+
+
 @pytest.mark.parametrize("runs", [[256,1536],[1,1535],[1,1537],[1,-1],[1,True],[1,1.5],[1,1536,0]])
 def test_invalid_semantic_rle_rejected(runs):
     with pytest.raises(ValueError):

@@ -63,6 +63,6 @@ async def save_frame(set_id: str, frame_id: str, request: Request):
 async def export_dataset(set_id: str, request: Request):
     try:
         payload = await request.json()
-        return export_set(set_id, payload.get("name", ""), payload.get("focus_region_id"))
+        return export_set(set_id, payload.get("name", ""), payload.get("focus_region_id"), payload.get("split_by_video"))
     except Exception as exc:
         raise api_error(exc)
