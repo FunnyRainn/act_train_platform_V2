@@ -9,7 +9,7 @@ from core.paths import PROJECT_ROOT
 from web.context import AppContext, set_context
 from web.routes import annotation, bootstrap, catalog, datasets, media, packages, pages, training
 
-VERSION = "V2.0.0.3"
+VERSION = "V2.0.0.4"
 
 
 def create_app() -> FastAPI:

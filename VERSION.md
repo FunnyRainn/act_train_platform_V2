@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`V2.0.0.3`
+`V2.0.0.4`
 
 ## Repository
 
@@ -42,6 +42,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## V2.0.0.4
+
+Train 配置转移工具 Windows 构建兼容修复：
+
+- 移除 Python 3.9 专属的 `Path.is_relative_to()` 依赖，允许使用 Windows 现有 Python 3.8 构建独立 EXE。
+- 保留根目录越界检查，不放宽数据库路径安全边界。
 
 ## V2.0.0.3
 

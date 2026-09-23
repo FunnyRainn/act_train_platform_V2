@@ -85,7 +85,11 @@ def database_path(train_root: Path) -> Path:
 
     root = train_root.resolve()
     database = (root / DATABASE_RELATIVE).resolve()
-    require(database.is_relative_to(root), "数据库路径越出 Train 根目录")
+    # Windows 现场可能使用 Python 3.8 构建 EXE，不能依赖 Python 3.9 才新增的 Path.is_relative_to。
+    try:
+        database.relative_to(root)
+    except ValueError as exc:
+        raise TransferError("数据库路径越出 Train 根目录") from exc
     require(database.is_file(), f"未找到 Train 数据库：{database}")
     return database
 
