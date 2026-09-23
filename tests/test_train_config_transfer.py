@@ -51,6 +51,15 @@ class TrainConfigTransferTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_windows_cmd_files_use_crlf_only(self) -> None:
+        """Windows CMD 必须使用 CRLF，避免现场 cmd.exe 把相邻命令错误拼接。"""
+
+        command_root = SCRIPT.parent / "train_config_transfer"
+        for command in sorted(command_root.glob("*.cmd")):
+            content = command.read_bytes()
+            self.assertIn(b"\r\n", content, command.name)
+            self.assertNotIn(b"\n", content.replace(b"\r\n", b""), command.name)
+
     def test_export_import_idempotent_and_rollback(self) -> None:
         source, target = make_root(self.root / "source", populated=True), make_root(self.root / "target")
         package = self.root / "package"

@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`V2.0.0.2`
+`V2.0.0.3`
 
 ## Repository
 
@@ -42,6 +42,13 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## V2.0.0.3
+
+Train 配置转移工具 Windows 启动脚本兼容修复：
+
+- 三个 CMD 使用 Windows CRLF 换行，避免 `cmd.exe` 把相邻命令错误拼接。
+- 不改变配置包格式、数据库迁移逻辑、冲突策略或 EXE 内容。
 
 ## V2.0.0.2
 
