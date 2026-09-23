@@ -2,7 +2,7 @@
 
 ## Current Version
 
-`V2.0.0.1`
+`V2.0.0.2`
 
 ## Repository
 
@@ -42,6 +42,14 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## V2.0.0.2
+
+Train 配置独立迁移工具版本：
+
+- 只迁移标签和产品配置白名单字段，不复制运行数据库或训练资产。
+- 配置冲突、文件篡改、Train 未停止或数据库运行侧文件存在时默认拒绝操作。
+- 提供导出、导入、恢复和 Windows 单文件 EXE 打包入口；目标机器运行时不依赖 Python 或 Conda。
 
 ## V2.0.0.1
 
