@@ -7,6 +7,8 @@ import importlib.util
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -50,6 +52,119 @@ class TrainConfigTransferTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_tool_process_with_train_root_argument_is_not_train(self):
+        root = make_root(self.root / "act_train_platform")
+        rows = [{"ProcessId": "102", "Name": "train_config_transfer.exe", "ExecutablePath": "D:\\工具\\train_config_transfer.exe",
+                 "CommandLine": '"D:\\工具\\train_config_transfer.exe" import --train-root "' + str(root) + '"'}]
+        with patch.object(transfer, "_windows_process_rows", return_value=rows):
+            transfer.assert_train_stopped(root)
+
+    def test_frozen_parent_and_unrelated_train_are_distinguished(self):
+        root = make_root(self.root / "act_train_platform")
+        exe = str(Path(sys.executable).resolve())
+        rows = [{"ProcessId": str(transfer.os.getpid()), "ParentProcessId": "102", "ExecutablePath": exe},
+                {"ProcessId": "102", "Name": "train_config_transfer.exe", "ExecutablePath": exe, "CommandLine": str(root)},
+                {"ProcessId": "103", "Name": "act_train_platform.exe", "ExecutablePath": str(self.root / "other/act_train_platform.exe"), "CommandLine": "act_train_platform.exe"}]
+        with patch.object(transfer.sys, "frozen", True, create=True), patch.object(transfer, "_windows_process_rows", return_value=rows):
+            transfer.assert_train_stopped(root)
+        rows.append({"ProcessId": "104", "Name": "act_train_platform.exe", "ExecutablePath": str(root / "act_train_platform.exe"), "CommandLine": "act_train_platform.exe --train-worker job"})
+        with patch.object(transfer, "_windows_process_rows", return_value=rows):
+            with self.assertRaises(transfer.TransferError):
+                transfer.assert_train_stopped(root)
+
+    def test_unknown_process_identity_is_not_treated_as_stopped(self):
+        with patch.object(transfer, "_windows_process_rows", return_value=[{"Name": "act_train_platform.exe", "ProcessId": "999"}]):
+            with self.assertRaisesRegex(transfer.TransferError, "无法确定"):
+                transfer.assert_train_stopped(self.root)
+
+    def test_same_target_operation_lock_rejects_parallel_call(self):
+        source = make_root(self.root / "source", populated=True)
+        with transfer.operation_lock(source):
+            with self.assertRaisesRegex(transfer.TransferError, "另一个"):
+                transfer.export_config(source, self.root / "package")
+        transfer.export_config(source, self.root / "package")
+
+    def test_historical_schemas_and_extra_fields_are_compatible(self):
+        repo = SCRIPT.parents[1]
+        for number, revision in enumerate(("36d9d7c6580834eea71834c3701da78c99e11089", "14faf25dcad84a67ab3a74d2ed633259d3a12e80")):
+            source = self.root / ("source" + str(number))
+            database = source / transfer.DATABASE_RELATIVE
+            database.parent.mkdir(parents=True)
+            schema = subprocess.check_output(["git", "-C", str(repo), "show", revision + ":core/schema.sql"], text=True)
+            with sqlite3.connect(database) as conn:
+                conn.executescript(schema)
+                conn.executescript("ALTER TABLE labels ADD COLUMN irrelevant TEXT;CREATE TABLE unrelated(value TEXT);INSERT INTO labels(code,group_code,name) VALUES('A1','A','中文');INSERT INTO projects(id,name,label_codes_json) VALUES('p','产品','[\"A1\"]');")
+            target = make_root(self.root / ("target" + str(number)))
+            package = self.root / ("package" + str(number))
+            transfer.export_config(source, package)
+            transfer.import_config(target, package)
+            self.assertEqual(transfer.read_config(database), transfer.read_config(target / transfer.DATABASE_RELATIVE))
+
+    def test_missing_column_and_invalid_enabled_rejected(self):
+        source = make_root(self.root / "source", populated=True)
+        database = source / transfer.DATABASE_RELATIVE
+        with sqlite3.connect(database) as conn:
+            conn.execute("UPDATE labels SET enabled=7")
+        with self.assertRaisesRegex(transfer.TransferError, "启用"):
+            transfer.read_config(database)
+        with sqlite3.connect(":memory:") as conn:
+            conn.execute("CREATE TABLE labels(code TEXT)")
+            with self.assertRaisesRegex(transfer.TransferError, "缺少字段"):
+                transfer.validate_schema(conn)
+
+    def test_restore_report_tampering_and_cross_target_rejected(self):
+        source, target = make_root(self.root / "source", populated=True), make_root(self.root / "target")
+        package = self.root / "package"
+        transfer.export_config(source, package)
+        batch = transfer.import_config(target, package)
+        other = make_root(self.root / "other")
+        with self.assertRaisesRegex(transfer.TransferError, "不属于"):
+            transfer.rollback(other, batch)
+        with (batch / "REPORT.json").open("a") as handle:
+            handle.write(" ")
+        with self.assertRaisesRegex(transfer.TransferError, "报告校验"):
+            transfer.rollback(target, batch)
+
+    def test_interrupted_before_write_recovery_and_retry(self):
+        source, target = make_root(self.root / "source", populated=True), make_root(self.root / "target")
+        package = self.root / "package"
+        transfer.export_config(source, package)
+        original = transfer.write_json
+        def interrupt(path, data):
+            original(path, data)
+            if path.name == "INCOMPLETE.json":
+                raise KeyboardInterrupt("中断")
+        with patch.object(transfer, "write_json", side_effect=interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                transfer.import_config(target, package)
+        with self.assertRaisesRegex(transfer.TransferError, "未完成"):
+            transfer.import_config(target, package)
+        transfer.rollback(target)
+        transfer.import_config(target, package)
+
+    def test_orphan_batch_and_post_import_changes_block(self):
+        source, target = make_root(self.root / "source", populated=True), make_root(self.root / "target")
+        package = self.root / "package"
+        transfer.export_config(source, package)
+        batch = transfer.import_config(target, package)
+        with sqlite3.connect(target / transfer.DATABASE_RELATIVE) as conn:
+            conn.execute("UPDATE projects SET notes='新数据'")
+        with self.assertRaisesRegex(transfer.TransferError, "已发生变化"):
+            transfer.rollback(target, batch)
+        (target / transfer.TRANSFER_RELATIVE / "orphan").mkdir()
+        with self.assertRaisesRegex(transfer.TransferError, "未完成"):
+            transfer.import_config(target, package)
+
+    def test_backup_failure_does_not_change_database(self):
+        source, target = make_root(self.root / "source", populated=True), make_root(self.root / "target")
+        package = self.root / "package"
+        transfer.export_config(source, package)
+        before = digest(target / transfer.DATABASE_RELATIVE)
+        with patch.object(transfer.shutil, "copy2", side_effect=OSError("磁盘空间不足")):
+            with self.assertRaises(OSError):
+                transfer.import_config(target, package)
+        self.assertEqual(digest(target / transfer.DATABASE_RELATIVE), before)
 
     def test_windows_cmd_files_use_crlf_only(self) -> None:
         """Windows CMD 必须使用 CRLF，避免现场 cmd.exe 把相邻命令错误拼接。"""

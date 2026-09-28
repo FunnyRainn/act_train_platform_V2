@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+from contextlib import closing, contextmanager
+from functools import wraps
 from datetime import datetime
 import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sqlite3
@@ -21,6 +24,7 @@ import uuid
 
 FORMAT_NAME = "act-train-config-transfer"
 FORMAT_VERSION = 1
+TOOL_VERSION = "1.0.0"
 DATABASE_RELATIVE = Path("data") / "act_train_platform.sqlite3"
 TRANSFER_RELATIVE = Path("data") / "config-transfer"
 CONFIG_NAME = "train-config.json"
@@ -34,6 +38,58 @@ REQUIRED_TABLE_COLUMNS = {
 
 class TransferError(RuntimeError):
     """表示可向现场人员直接展示的受控迁移错误。"""
+
+
+@contextmanager
+def operation_lock(train_root: Path):
+    """互斥本工具对同一目录的操作；锁在系统临时区，不写入旧系统。"""
+    identity = os.path.normcase(str(train_root.resolve()))
+    path = Path(tempfile.gettempdir()) / ("train-transfer-" + hashlib.sha256(identity.encode()).hexdigest() + ".lock")
+    require(not path.is_symlink(), "迁移锁路径异常，请保留现场检查")
+    handle = path.open("a+b")
+    acquired = False
+    try:
+        if path.stat().st_size == 0:
+            handle.write(b"0")
+            handle.flush()
+        handle.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except OSError as exc:
+            raise TransferError("另一个迁移操作正在处理此目录，请等待完成后重试") from exc
+        yield
+    finally:
+        if acquired:
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()
+
+
+def serialized(function):
+    """命令行与直接函数调用共用互斥，不能只保护CMD入口。"""
+    @wraps(function)
+    def wrapped(train_root, *args, **kwargs):
+        with operation_lock(train_root):
+            return function(train_root, *args, **kwargs)
+    return wrapped
+
+
+def pending_batches(train_root: Path) -> list[Path]:
+    """包括备份或报告阶段断电，不能仅以INCOMPLETE文件存在判断中断。"""
+    directory = train_root.resolve() / TRANSFER_RELATIVE
+    return sorted(path for path in directory.glob("*") if path.is_dir() and not (path / "RESTORED.json").exists()
+                  and ((path / "INCOMPLETE.json").exists() or not (path / "COMPLETE.json").exists()))
 
 
 def canonical_json(value: Any) -> str:
@@ -108,9 +164,12 @@ def _windows_process_rows() -> list[dict[str, str]]:
     if os.name != "nt":
         return []
     powershell = ("$OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new();"
-                  "Get-CimInstance Win32_Process | Select-Object ProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Csv -NoTypeInformation")
+                  "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Csv -NoTypeInformation")
     command = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", powershell]
-    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="strict", timeout=20)
+    except (subprocess.TimeoutExpired, UnicodeError) as exc:
+        raise TransferError("无法可靠读取Windows进程信息，请重试；未执行迁移") from exc
     require(result.returncode == 0, f"无法检查 Train 进程：{result.stderr.strip() or result.stdout.strip()}")
     return [dict(row) for row in csv.DictReader(io.StringIO(result.stdout))]
 
@@ -119,18 +178,39 @@ def assert_train_stopped(train_root: Path) -> None:
     """在 Windows 上按命令行和可执行文件位置识别仍在运行的 Train 服务。"""
 
     root_text = str(train_root.resolve()).casefold()
+    rows = _windows_process_rows()
+    by_pid = {str(row.get("ProcessId")): row for row in rows}
+    excluded = {str(os.getpid())}
+    cursor = by_pid.get(str(os.getpid()))
+    # PyInstaller单文件父进程可携带目标路径；仅凭同EXE和直接祖先关系排除。
+    while getattr(sys, "frozen", False) and cursor:
+        parent = by_pid.get(str(cursor.get("ParentProcessId")))
+        if not parent or str(parent.get("ExecutablePath") or "").casefold() != str(Path(sys.executable).resolve()).casefold():
+            break
+        pid = str(parent.get("ProcessId"))
+        if pid in excluded:
+            break
+        excluded.add(pid)
+        cursor = parent
     matches: list[str] = []
-    for row in _windows_process_rows():
+    for row in rows:
         pid_text = str(row.get("ProcessId") or "0")
-        if pid_text.isdigit() and int(pid_text) == os.getpid():
+        if pid_text in excluded:
             continue
         command_line = str(row.get("CommandLine") or "").casefold()
-        executable = str(row.get("ExecutablePath") or "").casefold()
+        raw_executable = str(row.get("ExecutablePath") or "")
+        executable = str(Path(raw_executable).resolve()).casefold() if raw_executable else ""
         name = str(row.get("Name") or "").casefold()
-        references_root = root_text in command_line or root_text in executable
-        packaged_train = "act_train_platform" in command_line or name == "act_train_platform.exe"
-        source_train = "app.py" in command_line and ("--port 28100" in command_line or "--port 18100" in command_line)
-        if (references_root and packaged_train) or source_train:
+        tokens = [a or b for a, b in re.findall(r'"([^\"]*)"|(\S+)', command_line)]
+        references_root = root_text + os.sep in command_line or executable.startswith(root_text + os.sep)
+        packaged_train = name == "act_train_platform.exe"
+        python = bool(re.fullmatch(r"python(?:w|[0-9.]*)?(?:\.exe)?", name))
+        if (python or packaged_train) and (not command_line or not executable):
+            raise TransferError("无法确定一个训练候选进程的归属，请正常停服后重试")
+        # 源码默认端口只是辅助线索；识别脚本/模块，不把任意目录参数当程序名。
+        source_tokens = [token for token in tokens if token in {"app.py", "core.train_worker"} or token.endswith(("/app.py", "\\app.py", "/train_worker.py", "\\train_worker.py"))]
+        relative_source = any(token in {"app.py", "core.train_worker"} for token in source_tokens)
+        if (packaged_train and references_root) or (python and source_tokens and (references_root or relative_source)):
             matches.append(f"PID={pid_text} {row.get('Name') or ''}")
     require(not matches, f"检测到 Train 仍在运行，请先正常停止：{'；'.join(matches)}")
 
@@ -156,6 +236,7 @@ def validate_schema(connection: sqlite3.Connection) -> None:
 def normalize_label(row: Any) -> dict[str, Any]:
     """只保留标签配置白名单字段并归一化基础类型。"""
 
+    require(row["enabled"] in (0, 1, False, True), "标签启用状态必须为0或1")
     return {"code": str(row["code"]).strip().upper(), "group_code": str(row["group_code"]).strip().upper(),
             "name": str(row["name"] or "").strip(), "description": str(row["description"] or "").strip(),
             "box_instruction": str(row["box_instruction"] or "").strip(), "enabled": bool(row["enabled"])}
@@ -176,6 +257,7 @@ def normalize_project(row: Any) -> dict[str, Any]:
 def validate_config(config: dict[str, Any]) -> None:
     """校验配置结构、唯一键、A/B/C 标签规则和产品引用完整性。"""
 
+    require(isinstance(config, dict), "配置包根节点必须为对象")
     require(config.get("format") == FORMAT_NAME and config.get("format_version") == FORMAT_VERSION, "配置包格式不受支持")
     labels, projects = config.get("labels"), config.get("projects")
     require(isinstance(labels, list) and isinstance(projects, list), "配置包缺少标签或产品列表")
@@ -200,7 +282,7 @@ def validate_config(config: dict[str, Any]) -> None:
 def read_config(database: Path) -> dict[str, Any]:
     """从源数据库读取标签和产品的逻辑配置快照。"""
 
-    with connect_read_only(database) as connection:
+    with closing(connect_read_only(database)) as connection:
         validate_schema(connection)
         labels = [normalize_label(row) for row in connection.execute("SELECT * FROM labels ORDER BY group_code,code")]
         projects = [normalize_project(row) for row in connection.execute("SELECT * FROM projects ORDER BY id")]
@@ -209,6 +291,7 @@ def read_config(database: Path) -> dict[str, Any]:
     return config
 
 
+@serialized
 def export_config(train_root: Path, output: Path) -> Path:
     """生成带完整性清单和完成标记的独立 JSON 配置包。"""
 
@@ -254,7 +337,7 @@ def verify_package(package: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 def preflight_import(database: Path, config: dict[str, Any]) -> dict[str, list[str]]:
     """导入前比较目标配置；同键不同内容一律拒绝。"""
 
-    with connect_read_only(database) as connection:
+    with closing(connect_read_only(database)) as connection:
         validate_schema(connection)
         labels = {row["code"]: normalize_label(row) for row in connection.execute("SELECT * FROM labels")}
         projects = {row["id"]: normalize_project(row) for row in connection.execute("SELECT * FROM projects")}
@@ -280,12 +363,15 @@ def preflight_import(database: Path, config: dict[str, Any]) -> dict[str, list[s
     return result
 
 
+@serialized
 def import_config(train_root: Path, package: Path) -> Path:
     """先备份目标数据库，再在单个事务中导入通过预检的新配置。"""
 
     assert_train_stopped(train_root)
     database = database_path(train_root)
     assert_no_sqlite_sidecars(database)
+    pending = [p.name for p in pending_batches(train_root)]
+    require(not pending, "存在未完成导入，请先运行恢复入口处理：" + "；".join(pending))
     manifest, config = verify_package(package)
     actions = preflight_import(database, config)
     transfer_root = train_root.resolve() / TRANSFER_RELATIVE
@@ -297,7 +383,7 @@ def import_config(train_root: Path, package: Path) -> Path:
     before_hash, backup = sha256_file(database), batch / "before.sqlite3"
     shutil.copy2(database, backup)
     require(sha256_file(backup) == before_hash, "导入前数据库备份校验失败")
-    write_json(batch / "INCOMPLETE.json", {"started_at": now_text(), "before_sha256": before_hash})
+    write_json(batch / "INCOMPLETE.json", {"started_at": now_text(), "before_sha256": before_hash, "target_root": str(train_root.resolve())})
     try:
         connection = sqlite3.connect(database)
         connection.execute("PRAGMA foreign_keys=ON")
@@ -320,7 +406,7 @@ def import_config(train_root: Path, package: Path) -> Path:
             raise
         finally:
             connection.close()
-        report = {"status": "committed", "finished_at": now_text(), "package_id": manifest["package_id"],
+        report = {"status": "committed", "finished_at": now_text(), "package_id": manifest["package_id"], "target_root": str(train_root.resolve()),
                   "before_sha256": before_hash, "after_sha256": sha256_file(database), "actions": actions}
         write_json(batch / "REPORT.json", report)
         (batch / "INCOMPLETE.json").unlink()
@@ -343,14 +429,31 @@ def _latest_batch(train_root: Path) -> Path:
     return candidates[0]
 
 
+@serialized
 def rollback(train_root: Path, batch: Path | None = None) -> Path:
     """仅在目标未被后续修改时恢复导入前数据库，并保存恢复前副本。"""
 
     assert_train_stopped(train_root)
     database = database_path(train_root)
     assert_no_sqlite_sidecars(database)
-    selected = batch.resolve() if batch else _latest_batch(train_root)
+    pending = pending_batches(train_root)
+    selected = batch.resolve() if batch else (pending[-1].resolve() if pending else _latest_batch(train_root).resolve())
+    require(selected.parent == (train_root / TRANSFER_RELATIVE).resolve(), "恢复批次不属于所选Train目录")
+    if (selected / "INCOMPLETE.json").exists():
+        state = read_json(selected / "INCOMPLETE.json")
+        require(state.get("target_root") == str(train_root.resolve()), "中断记录目标身份不符")
+        backup = selected / "before.sqlite3"
+        require(backup.is_file() and sha256_file(backup) == state.get("before_sha256"), "中断备份校验失败")
+        # 无完整提交回执时仅能确认未变化状态；不能猜测哪些新数据应当覆盖。
+        require(sha256_file(database) == state["before_sha256"], "中断后数据库已变化且缺少完整回执，请保留备份人工核对，禁止自动覆盖")
+        write_json(selected / "RESTORED.json", {"restored_at": now_text(), "status": "INTERRUPTED_NO_CHANGE"})
+        (selected / "INCOMPLETE.json").unlink()
+        return selected
+    require((selected / "COMPLETE.json").is_file(), "备份或提交记录中断且缺少完整回执，请保留该批次人工核对，不得删除记录后重导")
+    complete = read_json(selected / "COMPLETE.json")
+    require(complete.get("report_sha256") == sha256_file(selected / "REPORT.json"), "恢复报告校验失败")
     report = read_json(selected / "REPORT.json")
+    require(report.get("target_root", str(train_root.resolve())) == str(train_root.resolve()), "恢复记录目标身份不符")
     require(report.get("status") == "committed" and not (selected / "RESTORED.json").exists(), "所选批次不可恢复")
     require(sha256_file(database) == report.get("after_sha256"), "导入后数据库已发生变化，拒绝覆盖新配置")
     backup = selected / "before.sqlite3"
@@ -413,7 +516,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "rollback":
             print(f"RESTORED：{rollback(args.train_root, args.batch)}")
         return 0
-    except (TransferError, OSError, sqlite3.Error) as exc:
+    except (TransferError, OSError, sqlite3.Error, ValueError, KeyError, TypeError) as exc:
         print(f"失败：{exc}", file=sys.stderr)
         return 2
 
