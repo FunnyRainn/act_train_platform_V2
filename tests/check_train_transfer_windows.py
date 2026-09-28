@@ -1,13 +1,16 @@
 """真实Windows三CMD验收：仅合成资产，不启动训练或接触原发布系统。"""
 import argparse
+from contextlib import closing
 import hashlib
 import importlib.util
 import json
 import os
+import queue
 from pathlib import Path
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 
 
@@ -34,12 +37,46 @@ def run(source, tool, checks):
         # 真实入口由cmd解释，路径通过交互stdin输入；包含复制粘贴的双引号。
         inner = subprocess.list2cmdline([str(tool / names[action])])
         command = '"' + str(system / 'System32/cmd.exe') + '" /d /s /c "' + inner + '"'
-        result = subprocess.run(command, input='\n'.join('"' + str(p) + '"' for p in inputs) + '\n\n',
-                                capture_output=True, encoding='utf-8', errors='replace', timeout=60, env=environment, cwd=checks)
-        output = result.stdout + result.stderr
-        outcomes.append({'action': action, 'expected_success': success, 'exit_code': result.returncode})
+        process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   encoding='utf-8', errors='replace', env=environment, cwd=checks)
+        characters = queue.Queue()
+        def collect():
+            for character in iter(lambda: process.stdout.read(1), ''):
+                characters.put(character)
+            characters.put(None)
+        reader = threading.Thread(target=collect, daemon=True)
+        reader.start()
+        output, sent, paused = '', 0, False
+        deadline = time.monotonic() + 90
+        try:
+            while True:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('交互CMD超时：' + output[-500:])
+                try:
+                    character = characters.get(timeout=.2)
+                except queue.Empty:
+                    continue
+                if character is None:
+                    break
+                output += character
+                if character == '：' and sent < len(inputs):
+                    process.stdin.write('"' + str(inputs[sent]) + '"\n')
+                    process.stdin.flush()
+                    sent += 1
+                if not paused and ('Press any key to continue' in output or '请按任意键继续' in output):
+                    process.stdin.write('\n')
+                    process.stdin.flush()
+                    paused = True
+            process.wait(timeout=10)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+            process.stdin.close()
+            process.stdout.close()
+        outcomes.append({'action': action, 'expected_success': success, 'exit_code': process.returncode})
         (checks / ('cmd-%02d.log' % len(outcomes))).write_text(output, encoding='utf-8')
-        if (result.returncode == 0) != success or '\ufffd' in output:
+        if (process.returncode == 0) != success or '\ufffd' in output:
             raise RuntimeError('真实CMD结果/中文不符，见最后一个cmd日志：' + output[-600:])
         if success:
             assert {'export': 'EXPORTED', 'import': 'IMPORTED', 'rollback': 'RESTORED'}[action] in output
@@ -48,7 +85,7 @@ def run(source, tool, checks):
     def database(root, schema, populated=False):
         path = root / 'data/act_train_platform.sqlite3'
         path.parent.mkdir(parents=True)
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             conn.executescript(schema)
             conn.executescript("CREATE TABLE preservation(value TEXT);INSERT INTO preservation VALUES('必须保留');")
             if populated:
@@ -64,7 +101,7 @@ def run(source, tool, checks):
         assert sha(old_db) == old_hash
         invoke('import', [new, package])
         assert transfer.read_config(old_db) == transfer.read_config(new_db)
-        with sqlite3.connect(new_db) as conn:
+        with closing(sqlite3.connect(new_db)) as conn, conn:
             assert conn.execute('SELECT value FROM preservation').fetchone()[0] == '必须保留'
             assert conn.execute('SELECT count(*) FROM train_jobs').fetchone()[0] == 0
         invoke('import', [new, package])
@@ -75,7 +112,7 @@ def run(source, tool, checks):
     with transfer.operation_lock(new):
         assert '另一个迁移操作' in invoke('import', [new, package], False)
     invoke('import', [new, package])
-    with sqlite3.connect(new_db) as conn:
+    with closing(sqlite3.connect(new_db)) as conn, conn:
         conn.execute("UPDATE projects SET notes='新的配置'")
     changed = sha(new_db)
     assert '已发生变化' in invoke('rollback', [new], False)

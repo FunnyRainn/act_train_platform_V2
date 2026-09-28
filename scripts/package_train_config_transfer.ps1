@@ -11,6 +11,8 @@ if ($BuildDirectory) { $BuildRoot = [IO.Path]::GetFullPath($BuildDirectory) }
 if ($OutputDirectory) { $DistRoot = [IO.Path]::GetFullPath($OutputDirectory) }
 # 正式输出绝不覆盖，构建缓存仅位于调用者明确指定的本任务目录。
 if (Test-Path -LiteralPath $DistRoot) { throw "输出目录已存在，禁止覆盖：$DistRoot" }
+# PyInstaller的全局缓存也隔离到本任务内，--clean不得清理其他构建的缓存。
+$env:PYINSTALLER_CONFIG_DIR = Join-Path $BuildRoot "pyinstaller-config"
 $PythonArgs = @()
 if (-not $PythonExe) {
     if (-not (Get-Command py -ErrorAction SilentlyContinue)) { throw "构建机未找到Python；请通过PythonExe指定构建解释器。现场使用不需要Python。" }

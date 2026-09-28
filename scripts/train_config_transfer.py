@@ -503,6 +503,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """执行命令并输出单一明确结果；受控错误不打印冗长堆栈。"""
 
+    # 控制台及重定向均采用UTF-8，避免Windows管道退回系统ANSI编码。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     args = build_parser().parse_args(argv)
     try:
         if args.command == "inspect":
