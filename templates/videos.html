@@ -1,11 +1,36 @@
 {% extends "base.html" %}
-{% block title %}视频与抽帧 - 标注训练平台{% endblock %}
+{% block title %}素材与抽帧 - 标注训练平台{% endblock %}
 {% block content %}
 <section class="page-head">
   <div>
-    <h1>视频与抽帧</h1>
-    <p>视频先进入素材库，再复制到当前产品目录用于抽帧和标注。</p>
+    <h1>素材与抽帧</h1>
+    <p>选择产品后批量导入原图，或沿用视频导入与抽帧。原图可由不同任务的标注集共同引用。</p>
   </div>
+</section>
+<section class="panel form" id="image-import-panel">
+  <h2>批量导入原图</h2>
+  <p>最多10,000张，每张32 MiB、3,200万像素；JPEG / PNG / BMP / WebP。同时上传两个文件，刷新后可恢复任务；未上传文件需重新选择核对。</p>
+  <div class="form-row">
+    <label>素材集名称<input id="images-name" value="原图素材集" maxlength="120"></label>
+    <label>追加到<select id="images-target"><option value="">新建素材集</option></select></label>
+    <label>拍摄来源组<input id="images-group" placeholder="例如：相机1-拍摄片段A" maxlength="200"></label>
+    <label>已有拆分<select id="images-split"><option value="">尚未划分（导出时确认）</option><option value="train">训练</option><option value="val">验证</option><option value="test">测试</option></select></label>
+  </div>
+  <div class="form-row">
+    <label>多选图片<input id="images-files" type="file" multiple accept=".jpg,.jpeg,.png,.bmp,.webp"></label>
+    <label>选择文件夹<input id="images-folder" type="file" webkitdirectory multiple></label>
+  </div>
+  <p id="images-selected" role="status">尚未选择原图。文件夹保留相对目录，子目录不自动视作不同拍摄来源。</p>
+  <div class="form-row">
+    <button id="images-start" class="primary">创建任务并导入</button>
+    <label>恢复任务<select id="images-jobs"><option value="">选择最近导入任务</option></select></label>
+    <button id="images-resume">核对选中文件并继续／重试</button>
+    <button id="images-cancel" disabled>取消剩余上传</button>
+  </div>
+  <progress id="images-progress" value="0" max="1" style="width:100%"></progress>
+  <p id="images-status" role="status" aria-live="polite">成功文件立即保存；取消不删除已导入素材或标注。</p>
+  <details><summary>失败与待重新选择的文件</summary><pre id="images-errors" style="white-space:pre-wrap;max-height:220px;overflow:auto"></pre></details>
+  <a id="images-open" hidden>打开标注工作台</a>
 </section>
 <section class="panel form" id="video-flow">
   <h2>导入素材 <button class="help-dot" type="button" data-help-key="asset_library">?</button></h2>
@@ -43,5 +68,6 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/videos.js?v=1.0.0.8"></script>
+<script src="/static/js/videos.js?v={{ version }}"></script>
+<script src="/static/js/image_imports.js?v={{ version }}"></script>
 {% endblock %}

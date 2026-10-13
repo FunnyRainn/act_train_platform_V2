@@ -2,13 +2,21 @@
 {% block title %}三任务标注工作台{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/task_annotate.css">
-<header><h1>三任务标注工作台</h1><p>素材共用，任务独立。原始标注保留，导出生成新的数据集版本。</p></header>
+<header><h1>标注工作台</h1><p>素材共用，任务独立。有效编辑自动保存，切换前确认保存成功；原始标注不被导出覆盖。</p><a id="ta-legacy" href="/annotate">打开原检测数据（预标注／关键帧／中间帧）</a> · <a href="/videos">批量导入素材</a></header>
 <section class="ta-panel ta-controls">
   <label>产品项目<select id="ta-project"></select></label>
   <label>标注集<select id="ta-set"></select></label>
   <label>帧集<select id="ta-frameset"></select></label>
-  <label>图片<select id="ta-frame"></select></label>
+  <select id="ta-frame" hidden aria-label="当前帧标识"></select>
 </section>
+<section class="ta-panel ta-controls">
+  <button id="ta-prev" type="button">上一张 A</button>
+  <label>序号<input id="ta-ordinal" type="number" min="1" value="1" style="width:100px"></label>
+  <button id="ta-go" type="button">跳转</button><button id="ta-next" type="button">下一张 D</button>
+  <label style="flex:1">帧集进度<input id="ta-progress" type="range" min="1" max="1" value="1" style="width:100%"></label>
+  <span id="ta-frame-info" role="status">0 / 0</span>
+</section>
+<dialog id="ta-polygon-dialog"><h3>多边形尚未完成</h3><p>完成后保存再切换，或明确放弃本次未完成轮廓；已完成对象不会丢弃。</p><button id="ta-polygon-finish" type="button">完成并保存</button><button id="ta-polygon-discard" type="button">放弃未完成轮廓</button><button id="ta-polygon-cancel" type="button" autofocus>取消切换</button></dialog>
 <details class="ta-panel"><summary>新建任务标注集</summary>
   <form id="ta-create" class="ta-controls">
     <label>名称<input id="ta-name" required maxlength="120" placeholder="例如：扎带实例标注"></label>
@@ -54,4 +62,4 @@
   <span>至少保存两帧。多片段实例无法无损导出时会明确拒绝。</span>
 </section>
 {% endblock %}
-{% block scripts %}<script src="/static/js/task_annotate.js"></script>{% endblock %}
+{% block scripts %}<script src="/static/js/frame_pager.js?v={{ version }}"></script><script src="/static/js/task_annotate.js?v={{ version }}"></script>{% endblock %}

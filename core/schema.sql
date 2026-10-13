@@ -1,4 +1,52 @@
 -- V2.4新增表独立于旧矩形标注，重跑schema幂等，不重写历史数据。
+-- 原图导入任务只保存清单/状态；像素逐文件处理，三任务引用同一份内容寻址素材。
+CREATE TABLE IF NOT EXISTS image_assets (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    sha256 TEXT NOT NULL,
+    path TEXT NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    UNIQUE(project_id, sha256)
+);
+CREATE TABLE IF NOT EXISTS image_import_jobs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    frame_set_id TEXT NOT NULL REFERENCES frame_sets(id) ON DELETE CASCADE,
+    client_key TEXT NOT NULL,
+    manifest_sha256 TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    first_index INTEGER NOT NULL,
+    state TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(project_id, client_key)
+);
+CREATE TABLE IF NOT EXISTS image_import_items (
+    job_id TEXT NOT NULL REFERENCES image_import_jobs(id) ON DELETE CASCADE,
+    ordinal INTEGER NOT NULL,
+    original_name TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    byte_size INTEGER NOT NULL,
+    last_modified INTEGER NOT NULL,
+    source_group TEXT NOT NULL,
+    split TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'pending',
+    error TEXT NOT NULL DEFAULT '',
+    frame_id TEXT REFERENCES frames(id) ON DELETE SET NULL,
+    sha256 TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY(job_id, ordinal)
+);
+CREATE TABLE IF NOT EXISTS frame_image_sources (
+    frame_id TEXT PRIMARY KEY REFERENCES frames(id) ON DELETE CASCADE,
+    asset_id TEXT NOT NULL REFERENCES image_assets(id),
+    original_name TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    source_group TEXT NOT NULL,
+    split TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS ix_image_import_project ON image_import_jobs(project_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_frame_image_asset ON frame_image_sources(asset_id);
+
 CREATE TABLE IF NOT EXISTS task_annotation_sets (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -179,3 +227,4 @@ CREATE TABLE IF NOT EXISTS model_packages (
     metadata_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS ix_frames_stable_order ON frames(frame_set_id, frame_index, id);
