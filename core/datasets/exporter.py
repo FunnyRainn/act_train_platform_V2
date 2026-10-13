@@ -9,6 +9,7 @@ import cv2
 import yaml
 
 from core import store
+from core.datasets.filenames import DatasetFilenames, validate_target, windows_read_path
 from core.paths import DATASETS_DIR
 from core.runtime_paths import resolve_runtime_path
 from core.utils import clean_dir, new_id, split_by_ratio, unique_keep_order
@@ -201,7 +202,8 @@ def _require_history_structure(dataset: dict) -> Path:
     异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
     """
 
-    output_dir = resolve_runtime_path(dataset["output_dir"], "历史训练数据集目录", require_exists=True)
+    # 只在历史数据读取入口兼容旧Windows长路径，写出仍使用受控短名称。
+    output_dir = windows_read_path(resolve_runtime_path(dataset["output_dir"], "历史训练数据集目录", require_exists=False))
     if not output_dir.exists():
         raise FileNotFoundError(f"历史训练数据集目录不存在: {output_dir}")
     for root_name in ["images", "labels"]:
@@ -252,6 +254,7 @@ def _copy_history_dataset(
     current_class_map: dict[str, int],
     counts: dict,
     size_stats: dict,
+    filenames: DatasetFilenames | None = None,
 ) -> None:
     """用途：说明 YOLO 数据集导入、导出和版本管理 中 `_copy_history_dataset` 的职责和调用边界。
     入参：dataset、images_by_split、labels_by_split、current_class_map、counts、size_stats，按函数签名和调用上下文传入。
@@ -260,7 +263,9 @@ def _copy_history_dataset(
     异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
     """
 
-    output_dir = _require_history_structure(dataset)
+    output_dir = windows_read_path(_require_history_structure(dataset))
+    # 所有历史来源共用一次分配器，避免重复合并时继续叠加前缀。
+    filenames = filenames or DatasetFilenames(images_by_split["train"].parents[1])
     history_label_codes = dataset["label_codes"]
     missing_codes = [code for code in history_label_codes if code not in current_class_map]
     if missing_codes:
@@ -275,14 +280,13 @@ def _copy_history_dataset(
             if not src_label.exists():
                 counts["skipped_history_missing_label"] += 1
                 continue
-            stem = f"{dataset['id']}__{src_img.stem}"
-            dst_label = labels_by_split[split] / f"{stem}.txt"
+            dst_img, dst_label = filenames.allocate(split, src_img.suffix)
             box_count = _remap_label_file(src_label, dst_label, history_label_codes, current_class_map)
             if box_count <= 0:
                 counts["skipped_history_empty_label"] += 1
                 continue
-            dst_img = images_by_split[split] / f"{stem}{src_img.suffix.lower()}"
             shutil.copy2(src_img, dst_img)
+            filenames.record(dst_img, split, dataset["id"], src_img.relative_to(output_dir).as_posix())
             copied_size = _read_image_size(dst_img)
             if copied_size:
                 _add_size(size_stats, copied_size[0], copied_size[1])
@@ -401,7 +405,9 @@ def _export_one_dataset(
     class_map = {code: idx for idx, code in enumerate(label_codes)}
     dataset_id = new_id("dataset")
     output_dir = DATASETS_DIR / project_id / dataset_id
+    validate_target(output_dir)
     clean_dir(output_dir)
+    filenames = DatasetFilenames(output_dir)
 
     images_by_split = {split: output_dir / "images" / split for split in SPLITS}
     labels_by_split = {split: output_dir / "labels" / split for split in SPLITS}
@@ -464,9 +470,7 @@ def _export_one_dataset(
         if not src.exists():
             counts["skipped_unannotated"] += 1
             continue
-        stem = f"{frame_set_by_frame[frame_id]}__{src.stem}"
-        dst_img = images_by_split[split] / f"{stem}{src.suffix.lower()}"
-        dst_label = labels_by_split[split] / f"{stem}.txt"
+        dst_img, dst_label = filenames.allocate(split, src.suffix)
         if focus_region is None:
             shutil.copy2(src, dst_img)
             exported_size = _read_image_size(dst_img)
@@ -478,6 +482,7 @@ def _export_one_dataset(
         if exported_size:
             _add_size(size_stats, exported_size[0], exported_size[1])
         dst_label.write_text("\n".join(_yolo_line(class_map[ann["label_code"]], ann) for ann in anns), encoding="utf-8")
+        filenames.record(dst_img, split, frame_set_by_frame[frame_id], src.name)
         counts[split] += 1
         counts["boxes"] += len(anns)
         counts["current_frames"] += 1
@@ -487,7 +492,7 @@ def _export_one_dataset(
         history_dataset = store.get_dataset_version(history_dataset_id)
         # 历史数据集必须先校验作用域，防止全图数据和关注区域裁剪数据被意外混用。
         counts["scope_warnings"].extend(_validate_history_scope(history_dataset, image_scope, focus_region["id"] if focus_region else None, force_mixed_scope))
-        _copy_history_dataset(history_dataset, images_by_split, labels_by_split, class_map, counts, size_stats)
+        _copy_history_dataset(history_dataset, images_by_split, labels_by_split, class_map, counts, size_stats, filenames)
 
     if counts["current_frames"] + counts["history_images"] <= 0:
         raise ValueError("没有可导出的已确认标注帧或历史数据集内容")
@@ -517,6 +522,7 @@ def _export_one_dataset(
         "label_codes": label_codes,
         "force_mixed_scope": force_mixed_scope,
     }
+    filenames.save()
     (output_dir / "dataset_version.json").write_text(
         json.dumps(
             {

@@ -2,7 +2,12 @@
 
 ## Current Version
 
-`V2.4.0.10`
+`V2.4.1.0`
+
+## V2.4.1.0
+
+- 融合批准的 V2.2 分支功能与修复；保留 V2.4 任务、分割、轨迹和 Pie 合同。
+- 仅 V2.4 隔离研发候选；实测与批准状态以总控候选及台账为准。
 
 ## Repository
 
@@ -42,6 +47,28 @@ Versions use:
 - `build`: packaging, documentation, or non-behavioral release iteration.
 
 This project versions independently from `act_web`, `act_server`, `act_app`, and `train_act_det_yolo`.
+
+## V2.0.0.4
+
+Train 配置转移工具 Windows 构建兼容修复：
+
+- 移除 Python 3.9 专属的 `Path.is_relative_to()` 依赖，允许使用 Windows 现有 Python 3.8 构建独立 EXE。
+- 保留根目录越界检查，不放宽数据库路径安全边界。
+
+## V2.0.0.3
+
+Train 配置转移工具 Windows 启动脚本兼容修复：
+
+- 三个 CMD 使用 Windows CRLF 换行，避免 `cmd.exe` 把相邻命令错误拼接。
+- 不改变配置包格式、数据库迁移逻辑、冲突策略或 EXE 内容。
+
+## V2.0.0.2
+
+Train 配置独立迁移工具版本：
+
+- 只迁移标签和产品配置白名单字段，不复制运行数据库或训练资产。
+- 配置冲突、文件篡改、Train 未停止或数据库运行侧文件存在时默认拒绝操作。
+- 提供导出、导入、恢复和 Windows 单文件 EXE 打包入口；目标机器运行时不依赖 Python 或 Conda。
 
 ## V2.0.0.1
 

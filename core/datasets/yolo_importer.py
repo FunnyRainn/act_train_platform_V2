@@ -10,8 +10,9 @@ import yaml
 
 from core import store
 from core.datasets.exporter import _add_size, _finish_size_stats, _new_size_stats
+from core.datasets.filenames import DatasetFilenames, validate_target, windows_read_path
 from core.paths import DATASETS_DIR
-from core.utils import IMAGE_SUFFIXES, clean_dir, new_id, safe_name, unique_keep_order
+from core.utils import IMAGE_SUFFIXES, clean_dir, new_id, unique_keep_order
 
 SPLITS = ["train", "val", "test"]
 
@@ -24,7 +25,7 @@ def _dataset_root(dataset_dir: str | Path) -> Path:
     异常/失败语义：保持原有异常传播和失败处理语义，不新增错误处理分支。
     """
 
-    root = Path(dataset_dir).expanduser()
+    root = windows_read_path(Path(dataset_dir).expanduser())
     if not root.exists() or not root.is_dir():
         raise FileNotFoundError(f"数据集目录不存在: {root}")
     return root.resolve()
@@ -396,7 +397,9 @@ def import_yolo_dataset(
 
     dataset_id = new_id("dataset")
     output_dir = DATASETS_DIR / project_id / dataset_id
+    validate_target(output_dir)
     clean_dir(output_dir)
+    filenames = DatasetFilenames(output_dir)
     images_by_split = {split: output_dir / "images" / split for split in SPLITS}
     labels_by_split = {split: output_dir / "labels" / split for split in SPLITS}
     for path in [*images_by_split.values(), *labels_by_split.values()]:
@@ -420,9 +423,8 @@ def import_yolo_dataset(
         for split, (images_dir, labels_dir) in split_dirs.items():
             for image in _iter_images(images_dir):
                 relative = image.relative_to(images_dir)
-                stem = safe_name(str(relative.with_suffix("")), "image")
-                dst_img = images_by_split[split] / f"{stem}{image.suffix.lower()}"
-                dst_label = labels_by_split[split] / f"{stem}.txt"
+                # 名称与目录长度解耦；图片/标签成对分配，不因路径扁平化覆盖同名内容。
+                dst_img, dst_label = filenames.allocate(split, image.suffix)
                 # 图片复制进平台数据目录后再生成标签，外部目录后续移动不会影响平台数据集版本。
                 shutil.copy2(image, dst_img)
                 size = _read_image_size(dst_img)
@@ -446,6 +448,7 @@ def import_yolo_dataset(
                 else:
                     counts["missing_label_images"] += 1
                 dst_label.write_text("\n".join(out_lines), encoding="utf-8")
+                filenames.record(dst_img, split, "external_yolo", relative.as_posix())
                 counts[split] += 1
                 counts["source_images"] += 1
                 counts["boxes"] += len(out_lines)
@@ -480,6 +483,7 @@ def import_yolo_dataset(
             "names": {idx: code for code, idx in class_map.items()},
         }
         (output_dir / "dataset.generated.yaml").write_text(yaml.safe_dump(dataset_yaml, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        filenames.save()
         (output_dir / "dataset_version.json").write_text(
             json.dumps(
                 {
