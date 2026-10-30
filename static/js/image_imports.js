@@ -11,12 +11,14 @@
     running=value;
     for (const id of ['start','resume','jobs','files','folder','name','group','split','target']) el(id).disabled=value;
     document.getElementById('active-project').disabled=value;
-    el('cancel').disabled=!value || !allowCancel;
+    el('cancel').disabled=value ? !allowCancel : !selected || selected.state!=='active';
   }
   function draw(task) {
     const c=task.counts || {}, done=(c.completed||0)+(c.duplicate||0), failed=c.failed||0;
     el('progress').max=task.total || 1; el('progress').value=done+failed;
     el('status').textContent=`任务${task.state==='cancelled'?'已取消':task.state==='finished'?'已完成':running?'上传中':'可继续'}：完成 ${c.completed||0}，重复复用 ${c.duplicate||0}，失败 ${failed}，剩余 ${task.total-done-failed} / ${task.total}。`;
+    // 刷新/暂停后仍可终止持久任务；不强迫用户先重新选择原文件才能取消。
+    if(!running) el('cancel').disabled=task.state!=='active';
     el('open').hidden=!done; el('open').href=`/task-annotate?project_id=${encodeURIComponent(task.project_id)}&frame_set_id=${encodeURIComponent(task.frame_set_id)}`;
   }
   function rememberTask(task) {

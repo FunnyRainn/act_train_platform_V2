@@ -10,7 +10,7 @@ async function main(){
   node('active-project').value='project';
   node('images-name').value='new';node('images-group').value='known-source';
   const item={relative_path:'one.png',size:10,last_modified:20,ordinal:0,state:'pending'};
-  const old={id:'old',project_id:'project',counts:{completed:1},total:1,done:1,items:[],state:'finished'};
+  const old={id:'old',project_id:'project',counts:{completed:1,pending:1},total:2,done:1,items:[],state:'active'};
   const next={id:'new',project_id:'project',counts:{pending:1},total:1,done:0,items:[item],state:'active'};
   let resolveCreate,fetchStarted=false,posts=[],cancelled=false;
   const deferred=new Promise(resolve=>{resolveCreate=resolve;});
@@ -42,6 +42,7 @@ async function main(){
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../static/js/image_imports.js'),'utf8'),context);
   const tick=()=>new Promise(resolve=>setImmediate(resolve));
   await tick();await tick();
+  assert.equal(node('images-cancel').disabled,false,'恢复的持久任务可直接取消，无需重新选择文件');
   node('images-files').files=[{name:'one.png',size:10,lastModified:20}];
   await node('images-files').onchange();
   const creating=node('images-start').onclick();
@@ -53,6 +54,7 @@ async function main(){
   await node('images-cancel').onclick();await creating;
   assert.deepEqual(posts,['/api/image-imports','/api/image-imports/new/cancel']);
   assert.equal(node('images-start').disabled,false);
+  assert.equal(node('images-cancel').disabled,true,'已取消任务不再反复取消');
   assert.match(node('images-status').textContent,/已取消/);
   console.log('image import create/cancel interleaving passed');
 }
