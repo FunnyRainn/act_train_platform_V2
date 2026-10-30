@@ -50,11 +50,14 @@
     <div id="box-list" class="box-list"></div>
   </aside>
   <section class="panel annotator-main">
-    <div class="frame-toolbar">
-      <button id="prev-frame">上一帧</button>
-      <span id="frame-info">未选择帧</span>
-      <button id="next-frame">下一帧</button>
+    <div class="frame-toolbar" style="flex-wrap:wrap">
+      <button id="prev-frame" style="white-space:nowrap">上一帧</button>
+      <span id="frame-info" style="flex:1 1 16em">未选择帧</span>
+      <button id="next-frame" style="white-space:nowrap">下一帧</button>
+      <label>序号 <input id="legacy-ordinal" type="number" min="1" value="1" style="width:7em"></label>
+      <button id="legacy-go" type="button" style="white-space:nowrap">跳转</button>
     </div>
+    <label>定位 <input id="legacy-range" type="range" min="1" max="1" value="1"><span id="legacy-range-label">0 / 0</span></label>
     <div class="canvas-wrap">
       <img id="frame-image" alt="当前帧">
       <canvas id="bbox-canvas"></canvas>
@@ -63,5 +66,6 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/annotate.js?v=1.2.0.0"></script>
+<script src="/static/js/frame_pager.js?v={{ version }}"></script>
+<script src="/static/js/annotate.js?v={{ version }}"></script>
 {% endblock %}

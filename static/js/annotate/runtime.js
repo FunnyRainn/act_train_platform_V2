@@ -3,6 +3,11 @@
   frameSetId: "",
   frames: [],
   frameIndex: 0,
+  frameOffset: 0,
+  frameTotal: 0,
+  annotationRevision: "",
+  navigationBusy: false,
+  dirty: false,
   boxes: [],
   drawing: null,
   selectedIndex: -1,
@@ -24,26 +29,28 @@
 const canvas = $("#bbox-canvas");
 const ctx = canvas.getContext("2d");
 const image = $("#frame-image");
+// 只缓存一页元数据；各帧原图在实际跳转时才加载。
+const legacyPager = new FramePager((id, offset, frameId) => apiGet(
+  `/api/frame-sets/${encodeURIComponent(id)}/frames-page?offset=${offset}&limit=100${frameId ? `&frame_id=${encodeURIComponent(frameId)}` : ''}`));
 
 async function initAnnotator() {
   state.bootstrap = await loadBootstrap();
   fillSelect($("#frame-set-select"), state.bootstrap.frame_sets, item => item.id, item => `${item.name} (${item.frame_count}帧)`, "选择帧集");
   fillSelect($("#label-select"), state.bootstrap.labels.filter(item => item.enabled), item => item.code, item => `${item.code} ${item.name}`, "选择标签");
   updatePrelabelStatus("预标注空闲");
+  const requested = new URLSearchParams(location.search).get('frame_set_id');
+  if (requested && state.bootstrap.frame_sets.some(item => item.id === requested)) await loadFrameSet(requested);
 }
 
 async function loadFrameSet(frameSetId) {
   if (!frameSetId) return;
-  await flushPendingSave();
-  state.frameSetId = frameSetId;
-  state.frames = await apiGet(`/api/frame-sets/${frameSetId}/frames`);
-  state.frameIndex = 0;
-  updatePrelabelStatus("预标注空闲");
-  await showFrame();
+  let remembered = '';
+  try { remembered = localStorage.getItem(`legacy-frame:${frameSetId}`) || ''; } catch (_) { /* 禁止存储时仍可标注 */ }
+  await navigateLegacyFrame(0, frameSetId, remembered);
 }
 
 function currentFrame() {
-  return state.frames[state.frameIndex];
+  return state.frames[state.frameIndex - state.frameOffset];
 }
 
 function currentFrameSet() {
@@ -83,27 +90,62 @@ function updateFrameInfo() {
   }
   const total = state.boxes.length;
   const prelabels = state.boxes.filter(box => box.source === "prelabel").length;
-  $("#frame-info").textContent = `${state.frameIndex + 1}/${state.frames.length} | 原始帧号 ${frame.frame_index} | 当前帧框数 ${total} | 预标注 ${prelabels}`;
+  $("#frame-info").textContent = `${state.frameIndex + 1}/${state.frameTotal} | 原始帧号 ${frame.frame_index} | 当前帧框数 ${total} | 预标注 ${prelabels}`;
+  $('#legacy-ordinal').value = String(state.frameIndex + 1);
+  $('#legacy-ordinal').max = String(state.frameTotal);
+  $('#legacy-range').max = String(Math.max(1,state.frameTotal));
+  $('#legacy-range').value = String(state.frameIndex + 1);
+  $('#legacy-range-label').textContent = `${state.frameIndex + 1} / ${state.frameTotal}`;
 }
 
-async function showFrame() {
-  await flushPendingSave();
-  if (!state.frames.length) {
-    $("#frame-info").textContent = "帧集为空";
-    return;
+async function navigateLegacyFrame(index, frameSetId = state.frameSetId, remembered = '') {
+  if (state.navigationBusy || !frameSetId) return;
+  // 选择框先还原；保存失败不能让表单显示新帧集却仍编辑旧帧。
+  $('#frame-set-select').value = state.frameSetId;
+  if (state.drawing || state.focusDraft || state.focusDrawing || state.drag || state.focusDrag) {
+    showToast('请先完成或取消当前绘制/关注区域编辑，再切换图片', 'warn'); return;
   }
-  const frame = currentFrame();
-  const token = ++state.imageLoadToken;
-  image.onload = async () => {
-    if (token !== state.imageLoadToken || frame.id !== currentFrame()?.id) return;
-    image.style.display = "block";
-    fitCanvas();
-    await loadFocusRegions();
-    await loadBoxes(frame.id, token);
-    draw();
-  };
-  image.src = `/api/frames/${frame.id}/image?ts=${Date.now()}`;
-  updateFrameInfo();
+  state.navigationBusy = true;
+  const panel = document.querySelector('main');
+  if (panel) panel.inert = true;
+  try {
+    await flushPendingSave();
+    if (legacyPager.frameSet !== frameSetId) legacyPager.reset(frameSetId);
+    const candidate = await legacyPager.prepare(index, remembered);
+    if (!candidate) return;
+    if (!candidate.frame) throw Error('帧集为空');
+    const frame = candidate.frame;
+    const projectId = state.bootstrap.frame_sets.find(item => item.id === frameSetId)?.project_id;
+    const [snapshot, focus] = await Promise.all([
+      apiGet(`/api/frame-sets/${frameSetId}/annotations-snapshot?frame_id=${frame.id}`),
+      apiGet(`/api/focus-regions?project_id=${encodeURIComponent(projectId)}`),
+    ]);
+    const nextImage = new Image();
+    nextImage.src = `/api/frames/${frame.id}/image`;
+    await nextImage.decode();
+    // 图片与标注均成功后一次切换；迟到页响应不能改变当前编辑身份。
+    if (!legacyPager.commit(candidate)) return;
+    state.frameSetId = frameSetId; state.frames = candidate.page.items;
+    state.frameOffset = candidate.page.offset; state.frameTotal = candidate.page.total;
+    state.frameIndex = candidate.index; state.annotationRevision = snapshot.revision;
+    state.boxes = snapshot.annotations; state.focusRegions = focus;
+    state.selectedIndex = -1; state.dirty = false;
+    const token = ++state.imageLoadToken;
+    image.onload = () => { if (token === state.imageLoadToken) { fitCanvas(); draw(); } };
+    image.src = nextImage.src; image.style.display = 'block';
+    $('#frame-set-select').value = frameSetId;
+    renderFocusRegions(); renderBoxList(); fitCanvas(); draw();
+    $('#save-status').textContent = '已加载';
+    try { localStorage.setItem(`legacy-frame:${frameSetId}`, frame.id); } catch (_) { /* 存储不可用不影响保存 */ }
+  } catch (error) {
+    // 当前图片/编辑始终保留；下一次定位从已提交的帧集重新准备。
+    legacyPager.reset(state.frameSetId);
+    $('#frame-set-select').value = state.frameSetId;
+    updateFrameInfo(); showToast(error.message, 'error');
+  } finally {
+    state.navigationBusy = false;
+    if (panel) panel.inert = false;
+  }
 }
 
 async function loadFocusRegions() {
@@ -128,9 +170,10 @@ async function loadBoxes(frameId = null, token = state.imageLoadToken) {
   const frame = currentFrame();
   if (!frame) return;
   const expectedFrameId = frameId || frame.id;
-  const boxes = await apiGet(`/api/frame-sets/${state.frameSetId}/annotations?frame_id=${expectedFrameId}`);
+  const snapshot = await apiGet(`/api/frame-sets/${state.frameSetId}/annotations-snapshot?frame_id=${expectedFrameId}`);
   if (token !== state.imageLoadToken || expectedFrameId !== currentFrame()?.id) return;
-  state.boxes = boxes;
+  state.boxes = snapshot.annotations;
+  state.annotationRevision = snapshot.revision;
   state.selectedIndex = -1;
   renderBoxList();
   updateFrameInfo();
@@ -575,9 +618,10 @@ function scheduleSave() {
   const payload = currentSavePayload();
   if (!payload) return;
   state.pendingSavePayload = payload;
+  state.dirty = true;
   $("#save-status").textContent = "保存中...";
   clearTimeout(state.saveTimer);
-  state.saveTimer = setTimeout(() => saveFramePayload(payload), 450);
+  state.saveTimer = setTimeout(() => saveFramePayload(payload).catch(() => {}), 450);
 }
 
 async function flushPendingSave() {
@@ -597,13 +641,23 @@ async function saveFramePayload(payload) {
   clearTimeout(state.saveTimer);
   state.saveTimer = null;
   state.pendingSavePayload = null;
-  state.saving = state.saving.then(async () => {
+  // 显式再次保存可以重试网络错误；切帧仍等待原Promise并传播失败，不能丢编辑。
+  state.saving = state.saving.catch(() => {}).then(async () => {
     try {
-      await apiPost("/api/annotations/frame", payload);
-      $("#save-status").textContent = "已保存";
+      if (payload.frame_id !== currentFrame()?.id) throw Error('标注所属帧已变化，拒绝写入');
+      const response = await fetch('/api/annotations/frame', {method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({...payload,revision:state.annotationRevision})});
+      const saved = await parseApiResponse(response);
+      state.annotationRevision = saved.revision;
+      if (JSON.stringify(state.boxes) === JSON.stringify(payload.annotations)) {
+        state.boxes = saved.annotations; state.dirty = false;
+        renderBoxList(); draw();
+      }
+      $("#save-status").textContent = state.dirty ? '仍有编辑待保存' : '已保存';
     } catch (error) {
       $("#save-status").textContent = "保存失败";
       showToast(error.message, "error");
+      throw error;
     }
   });
   return state.saving;
@@ -616,15 +670,14 @@ async function saveCurrentFrame() {
 }
 
 async function goFrame(delta) {
-  if (!state.frames.length) return;
+  if (!state.frames.length || state.navigationBusy) return;
   const nextIndex = state.frameIndex + delta;
-  if (nextIndex < 0 || nextIndex >= state.frames.length) return;
-  await flushPendingSave();
-  state.frameIndex = nextIndex;
-  await showFrame();
+  if (nextIndex < 0 || nextIndex >= state.frameTotal) return;
+  await navigateLegacyFrame(nextIndex);
 }
 
 function clearCurrentFrameBoxes() {
+  if (state.navigationBusy) return;
   if (!state.frameSetId || !currentFrame()) return;
   state.boxes = [];
   state.selectedIndex = -1;
@@ -746,7 +799,7 @@ $("#new-track-btn").addEventListener("click", async () => {
   }
 });
 
-$("#save-frame-btn").addEventListener("click", saveCurrentFrame);
+$("#save-frame-btn").addEventListener("click", () => saveCurrentFrame().catch(() => {}));
 $("#interpolate-btn").addEventListener("click", async () => {
   try {
     await flushPendingSave();
@@ -822,6 +875,18 @@ $("#clear-prelabels-btn")?.addEventListener("click", async () => {
 $("#clear-boxes-btn")?.addEventListener("click", clearCurrentFrameBoxes);
 $("#prev-frame").addEventListener("click", () => goFrame(-1));
 $("#next-frame").addEventListener("click", () => goFrame(1));
+$('#legacy-go').addEventListener('click', () => {
+  const index = Number($('#legacy-ordinal').value) - 1;
+  if (!Number.isInteger(index) || index < 0 || index >= state.frameTotal) return showToast('序号超出帧集范围', 'error');
+  navigateLegacyFrame(index);
+});
+$('#legacy-range').addEventListener('input', event => {
+  $('#legacy-range-label').textContent = `${event.target.value} / ${state.frameTotal}`;
+});
+$('#legacy-range').addEventListener('change', event => navigateLegacyFrame(Number(event.target.value) - 1));
+window.addEventListener('beforeunload', event => {
+  if (state.dirty || state.drawing || state.focusDraft) { event.preventDefault(); event.returnValue = ''; }
+});
 
 window.ActAnnotate?.Shortcuts?.bindFrameShortcuts({ goFrame, clearCurrentFrameBoxes });
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 from pathlib import Path
 from typing import Any
@@ -628,7 +629,30 @@ def list_annotations(frame_set_id: str, frame_id: str | None = None) -> list[dic
         return rows_to_dicts(conn.execute(sql, params).fetchall())
 
 
-def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str, annotations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+class AnnotationConflict(ValueError):
+    """客户端修订落后于持久化标注，拒绝整帧覆盖。"""
+
+
+def _annotation_snapshot(conn, frame_set_id: str, frame_id: str) -> dict:
+    """在调用者事务内读取完整快照；稳定排序使同一修订可重复校验。"""
+    owner = conn.execute("SELECT frame_set_id FROM frames WHERE id=?", (frame_id,)).fetchone()
+    if owner is None or owner[0] != frame_set_id:
+        raise ValueError("帧不属于当前帧集")
+    rows = rows_to_dicts(conn.execute(
+        "SELECT * FROM annotations WHERE frame_set_id=? AND frame_id=? ORDER BY created_at,id",
+        (frame_set_id, frame_id)).fetchall())
+    return {"annotations": rows, "revision": hashlib.sha256(json_dumps(rows).encode("utf-8")).hexdigest()}
+
+
+def annotation_snapshot(frame_set_id: str, frame_id: str) -> dict:
+    """仅读取，不因浏览创建空标注或新修订。"""
+    with get_conn() as conn:
+        conn.execute("BEGIN")
+        return _annotation_snapshot(conn, frame_set_id, frame_id)
+
+
+def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str, annotations: list[dict[str, Any]],
+                              *, expected_revision: str | None = None, return_snapshot: bool = False):
     """用途：说明 SQLite 仓储读写和兼容数据访问 中 `replace_frame_annotations` 的职责和调用边界。
     入参：project_id、frame_set_id、frame_id、annotations，按函数签名和调用上下文传入。
     返回：保持原函数既有返回类型和返回内容。
@@ -636,10 +660,16 @@ def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str,
     异常/失败语义：记录不存在、数据非法或 SQLite 操作失败时，沿用原有 KeyError、ValueError 或数据库异常语义。
     """
 
-    frame = get_frame(frame_id)
-    if frame["frame_set_id"] != frame_set_id:
-        raise ValueError(f"帧 {frame_id} 不属于帧集 {frame_set_id}，拒绝覆盖标注")
     with get_conn() as conn:
+        # 修订核对与覆盖必须同一写事务；并发旧接口或预标注写入也会被摘要识别。
+        conn.execute("BEGIN IMMEDIATE")
+        frame = conn.execute("SELECT f.frame_set_id,fs.project_id FROM frames f JOIN frame_sets fs ON fs.id=f.frame_set_id WHERE f.id=?",
+                             (frame_id,)).fetchone()
+        if frame is None or frame[0] != frame_set_id or frame[1] != project_id:
+            raise ValueError("帧、帧集与项目归属不一致，拒绝覆盖标注")
+        current = _annotation_snapshot(conn, frame_set_id, frame_id)
+        if expected_revision is not None and expected_revision != current["revision"]:
+            raise AnnotationConflict("标注已被其他操作修改；保留当前编辑，请核对最新内容后重试")
         # 单帧标注采用整帧替换语义，前端提交的是该帧当前完整标注快照。
         conn.execute("DELETE FROM annotations WHERE frame_id=?", (frame_id,))
         for item in annotations:
@@ -666,7 +696,8 @@ def replace_frame_annotations(project_id: str, frame_set_id: str, frame_id: str,
                     now_text(),
                 ),
             )
-    return list_annotations(frame_set_id, frame_id)
+        result = _annotation_snapshot(conn, frame_set_id, frame_id)
+    return result if return_snapshot else result["annotations"]
 
 
 def add_annotation(project_id: str, frame_set_id: str, frame_id: str, item: dict[str, Any]) -> dict[str, Any]:

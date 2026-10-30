@@ -1,11 +1,36 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from core import annotation_ops, prelabel_ops, store
 from web.context import api_error
 
 router = APIRouter()
+
+
+@router.get("/api/frame-sets/{frame_set_id}/annotations-snapshot")
+def get_annotation_snapshot(frame_set_id: str, frame_id: str):
+    """为新工作台返回标注及修订，旧列表接口继续兼容。"""
+    try:
+        return store.annotation_snapshot(frame_set_id, frame_id)
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@router.put("/api/annotations/frame")
+async def save_annotation_snapshot(request: Request):
+    """有修订的整帧保存；冲突返回409，绝不静默覆盖其他编辑。"""
+    try:
+        payload = await request.json()
+        revision = payload.get("revision")
+        if not isinstance(revision, str) or len(revision) != 64:
+            raise ValueError("保存标注必须携带有效修订")
+        return store.replace_frame_annotations(payload["project_id"], payload["frame_set_id"], payload["frame_id"],
+            payload.get("annotations") or [], expected_revision=revision, return_snapshot=True)
+    except store.AnnotationConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception as exc:
+        raise api_error(exc)
 
 
 @router.get("/api/frame-sets/{frame_set_id}/annotations")

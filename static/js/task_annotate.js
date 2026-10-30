@@ -151,10 +151,13 @@
     el("fragment").hidden = task !== "instance_segment"; el("delete").hidden = task === "semantic_segment"; el("brush").disabled = task !== "semantic_segment";
   }
   async function loadProject() {
-    reset(); sets = []; spec = null; el("frame").replaceChildren(); pager.reset('');navigation();
-    if (!el("project").value) return;
+    if (!el("project").value) {
+      reset(); sets = []; spec = null; el("frame").replaceChildren(); pager.reset('');navigation(); return;
+    }
     const project = encodeURIComponent(el("project").value);
     const [setRows, frames, focus] = await Promise.all([apiGet(`/api/annotation-sets?project_id=${project}`), apiGet(`/api/frame-sets?project_id=${project}`), apiGet(`/api/focus-regions?project_id=${project}`)]);
+    // 请求成功后再提交新项目，失败时保留旧图片及旧集合，供选择器恢复。
+    reset(); el("frame").replaceChildren(); pager.reset('');navigation();
     sets = setRows; selectOptions("set", sets, row => `${row.name} · ${names[row.task_type]}`);
     selectOptions("frameset", frames, row => row.name); fillSelect(el("focus"), focus, row => row.id, row => row.name, "原图完整范围"); configure();
   }
@@ -164,12 +167,16 @@
       const next=el(key).value; el(key).value=selection[key];
       if (busy || !await canLeave()) return;
       el(key).value=next;
+      const previousPager={frameSet:pager.frameSet,total:pager.total,index:pager.index,page:pager.page};
       try {
         if (key === "project") {lockEditor(true);await loadProject();}
         else if (key === "set") {configure(); if(spec) await go(Math.max(0,pager.index),true);else reset();}
         else {pager.reset(next);if(next) await go(0,true);else {reset();navigation();}}
         for(const field of Object.keys(selection)) selection[field]=el(field).value;
-      } catch(error) {el(key).value=selection[key];configure();throw error;}
+      } catch(error) {
+        el(key).value=selection[key];Object.assign(pager,previousPager);pager.generation++;
+        configure();navigation();throw error;
+      }
       finally { lockEditor(false); }
     });
   });

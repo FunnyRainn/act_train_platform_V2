@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from .store_impl import (
+    AnnotationConflict,
+    annotation_snapshot,
     add_annotation,
     confirm_frame_set_prelabels,
     count_frame_set_prelabels,
@@ -14,6 +16,8 @@ from .store_impl import (
 )
 
 __all__ = [
+    "AnnotationConflict",
+    "annotation_snapshot",
     "add_annotation",
     "confirm_frame_set_prelabels",
     "count_frame_set_prelabels",
