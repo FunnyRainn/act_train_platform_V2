@@ -19,18 +19,33 @@
     el('status').textContent=`任务${task.state==='cancelled'?'已取消':task.state==='finished'?'已完成':running?'上传中':'可继续'}：完成 ${c.completed||0}，重复复用 ${c.duplicate||0}，失败 ${failed}，剩余 ${task.total-done-failed} / ${task.total}。`;
     el('open').hidden=!done; el('open').href=`/task-annotate?project_id=${encodeURIComponent(task.project_id)}&frame_set_id=${encodeURIComponent(task.frame_set_id)}`;
   }
-  async function refresh() {
+  function rememberTask(task) {
+    try {localStorage.setItem(`image-import:${task.project_id}`,task.id);} catch (_) { /* 状态仍可从任务列表恢复 */ }
+  }
+  async function refresh({preserve=false}={}) {
     if(running) return;
-    const token=++generation, id=project(); selected=null;
+    const token=++generation, id=project(), previousTarget=el('target').value,
+      retained=preserve && selected?.project_id===id ? selected : null; selected=retained;
     const [jobs,sets]=id?await Promise.all([apiGet(`/api/image-imports?project_id=${encodeURIComponent(id)}`),apiGet(`/api/frame-sets?project_id=${encodeURIComponent(id)}`)]):[[],[]];
     if(token!==generation) return;
     fillSelect(el('jobs'),jobs,row=>row.id,row=>`${row.created_at} · ${row.done}/${row.total} · ${row.state}`,'选择最近导入任务');
     fillSelect(el('target'),sets.filter(row=>row.config?.source_type==='browser_images'),row=>row.id,row=>`${row.name}（${row.frame_count}张）`,'新建素材集');
+    if(sets.some(row=>row.id===previousTarget)) el('target').value=previousTarget;
+    let last=retained?.id;
+    if(!last) try {last=localStorage.getItem(`image-import:${id}`);} catch (_) { /* 本地存储不可用时手选任务 */ }
+    if(last && jobs.some(row=>row.id===last)) {
+      const task=retained || await apiGet(`/api/image-imports/${encodeURIComponent(last)}`);
+      if(token!==generation) return;
+      selected=task;el('jobs').value=last;draw(task);
+    }
   }
   for(const id of ['files','folder']) el(id).onchange=safe(async()=>{
     if(!limits) throw Error('导入限制尚未加载，请稍后重试');
     const chosen=Array.from(el(id).files || []);
     files=chosen.filter(file=>limits.extensions.some(ext=>file.name.toLowerCase().endsWith(ext)));
+    // 文件选择器枚举顺序不稳定；仅为新任务排序，既有任务仍按持久ordinal恢复。
+    const collator=new Intl.Collator('zh-CN',{numeric:true,sensitivity:'variant'});
+    files.sort((left,right)=>collator.compare(fileInfo(left).relative_path,fileInfo(right).relative_path));
     if(files.length>limits.files) {files=[]; throw Error(`一次最多 ${limits.files} 张`);}
     if(files.some(file=>!file.size || file.size>limits.file_bytes)) {files=[]; throw Error('含空文件或超过32MiB的文件，请重新选择');}
     el(id==='files'?'folder':'files').value='';
@@ -39,10 +54,10 @@
   el('jobs').onchange=safe(async()=>{
     const id=el('jobs').value, token=++generation;
     const task=id?await apiGet(`/api/image-imports/${encodeURIComponent(id)}`):null;
-    if(token!==generation) return; selected=task; if(task) draw(task);
+    if(token!==generation) return; selected=task; if(task) {rememberTask(task);draw(task);}
   });
   async function uploadTask(task) {
-    locked(true); selected=task; el('errors').textContent=''; draw(task);
+    locked(true); selected=task; rememberTask(task); el('errors').textContent=''; draw(task);
     const available=new Map(files.map(file=>[identity(fileInfo(file)),file]));
     let pending=[], messages=[], stopped=false;
     try {
@@ -78,6 +93,7 @@
       el('errors').textContent=messages.slice(0,100).join('\n')+(messages.length>100?`\n另有${messages.length-100}项，请按任务逐页重试。`:'');
       // 只刷新素材列表，不重置当前任务/已选文件，使失败重试仍使用同一任务。
       await refreshVideos();
+      await refresh({preserve:true});
     }
   }
   el('start').onclick=safe(async()=>{

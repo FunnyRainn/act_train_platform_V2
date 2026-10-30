@@ -7,6 +7,9 @@
     <p>选择产品后批量导入原图，或沿用视频导入与抽帧。原图可由不同任务的标注集共同引用。</p>
   </div>
 </section>
+<section class="panel form">
+  <label>当前产品<select id="active-project" name="project_id"></select></label>
+</section>
 <section class="panel form" id="image-import-panel">
   <h2>批量导入原图</h2>
   <p>最多10,000张，每张32 MiB、3,200万像素；JPEG / PNG / BMP / WebP。同时上传两个文件，刷新后可恢复任务；未上传文件需重新选择核对。</p>
@@ -34,7 +37,6 @@
 </section>
 <section class="panel form" id="video-flow">
   <h2>导入素材 <button class="help-dot" type="button" data-help-key="asset_library">?</button></h2>
-  <label>产品<select id="active-project" name="project_id"></select></label>
   <label>导入方式<select id="import-mode"><option value="upload">上传视频</option><option value="path">服务器路径导入</option></select></label>
   <form class="form" id="upload-form">
     <label>产品<select name="project_id"></select></label>

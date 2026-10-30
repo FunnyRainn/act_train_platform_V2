@@ -34,7 +34,7 @@ function syncFrameSetName(force = false) {
 
 function renderVideoLists() {
   const projectId = activeProjectId();
-  const productVideos = videoData.videos.filter(video => !projectId || video.project_id === projectId);
+  const productVideos = videoData.videos.filter(video => video.source_type !== 'image_dataset' && (!projectId || video.project_id === projectId));
   $("#asset-list").innerHTML = videoData.video_assets.length ? videoData.video_assets.map(asset => rowHtml(
     esc(asset.name),
     `素材来源: ${esc(asset.source_type)} | ${asset.width}x${asset.height} | ${Number(asset.duration_sec).toFixed(1)}秒 | ${esc(asset.stored_path)}`
@@ -60,6 +60,7 @@ async function refreshVideos() {
   fillSelect($("#active-project"), videoData.projects, item => item.id, item => item.name, "选择产品");
   if (currentProject) $("#active-project").value = currentProject;
   $$("form select[name=project_id]").forEach(select => fillSelect(select, videoData.projects, item => item.id, item => item.name, "选择产品"));
+  syncProjectSelects();
   renderVideoLists();
 }
 
