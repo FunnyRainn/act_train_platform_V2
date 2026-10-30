@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Request
 from core import task_annotations as annotations
 from core.task_dataset import export_set
+from core.dataset_splits import preview as preview_split
 from core.task_importer import import_set, inspect_source, import_unannotated_images
 from web.context import api_error
 
@@ -73,6 +74,18 @@ async def save_frame(set_id: str, frame_id: str, request: Request):
 async def export_dataset(set_id: str, request: Request):
     try:
         payload = await request.json()
-        return export_set(set_id, payload.get("name", ""), payload.get("focus_region_id"), payload.get("split_by_video"))
+        return export_set(set_id, payload.get("name", ""), payload.get("focus_region_id"), payload.get("split_by_video"),
+                          payload.get("allow_frame_split", False), payload.get("split_preview_hash"))
+    except Exception as exc:
+        raise api_error(exc)
+
+
+@router.post("/api/annotation-sets/{set_id}/export-preview")
+async def export_preview(set_id: str, request: Request):
+    try:
+        payload = await request.json()
+        result = preview_split(set_id, allow_frame_split=payload.get('allow_frame_split',False), split_by_video=payload.get('split_by_video'))
+        # 页面需要分组/数量和修订摘要，不默认广播逐帧分配大字典。
+        return {key:value for key,value in result.items() if key not in {'assignments','annotation_revisions'}}
     except Exception as exc:
         raise api_error(exc)

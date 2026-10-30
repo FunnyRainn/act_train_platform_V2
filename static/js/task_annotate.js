@@ -303,7 +303,19 @@
   el("export").onclick = attempt(async () => {
     if(!spec) throw Error("请选择标注集"); if(dirty || polygon.length) throw Error("请先保存当前编辑，再导出标注集");
     el("export").disabled=true;
-    try { const result=await apiPost(`/api/annotation-sets/${spec.id}/export`,{name:spec.name,focus_region_id:el("focus").value||null}); status(`数据集已生成：${result.name}（${result.id}），可进入模型训练`); } finally {el("export").disabled=false;}
+    try {
+      let allow_frame_split=false;
+      const url=`/api/annotation-sets/${spec.id}`;
+      let preview=await apiPost(`${url}/export-preview`,{allow_frame_split});
+      if(preview.requires_choice) {
+        if(!confirm(`${preview.warnings.join('\n')}\n\n确认接受仅作内部功能验证的按帧划分？取消后可以补充独立拍摄来源。`)) return;
+        allow_frame_split=true;preview=await apiPost(`${url}/export-preview`,{allow_frame_split});
+      }
+      const summary=`训练 ${preview.counts.train||0} / 验证 ${preview.counts.val||0} / 测试 ${preview.counts.test||0}\n${preview.groups.map(group=>`${group.source}：${group.count}张 → ${group.split}`).join('\n')}\n${preview.warnings.join('\n')}`;
+      if(!confirm(`导出划分预览（只包含已保存标注）\n${summary}\n确认生成数据集版本？`)) return;
+      const result=await apiPost(`${url}/export`,{name:spec.name,focus_region_id:el("focus").value||null,allow_frame_split,split_preview_hash:preview.preview_hash});
+      status(`数据集已生成：${result.name}（${result.id}），可进入模型训练`);
+    } finally {el("export").disabled=false;}
   });
   canvas.onkeydown = event => { if(event.key==="Enter") {event.preventDefault(); el("finish").click();} if(event.key==="Escape") {polygon=[];fragment=false;redraw();} if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="z") {event.preventDefault();el(event.shiftKey?"redo":"undo").click();} };
   window.addEventListener("beforeunload",event=>{if(dirty||polygon.length){event.preventDefault();event.returnValue="";}});

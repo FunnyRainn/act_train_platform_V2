@@ -15,6 +15,7 @@ from core.db import get_conn
 from core.paths import DATASETS_DIR
 from core.runtime_paths import resolve_runtime_path
 from core.task_annotations import get_set, checked_frame
+from core.dataset_splits import preview as preview_split
 from core.utils import new_id
 
 
@@ -67,9 +68,15 @@ def object_labels(spec: dict, objects: list[dict], width: int, height: int, boun
     return lines
 
 
-def export_set(set_id: str, name: str, focus_region_id: str | None = None, split_by_video: dict | None = None) -> dict:
+def export_set(set_id: str, name: str, focus_region_id: str | None = None, split_by_video: dict | None = None,
+               allow_frame_split: bool = False, expected_split_hash: str | None = None) -> dict:
     """先验证所有标注，再生成单一不可变导出版本；至少两帧避免训练验证同图。"""
     spec = get_set(set_id)
+    split_plan = preview_split(set_id, allow_frame_split=allow_frame_split, split_by_video=split_by_video)
+    if split_plan['requires_choice']:
+        raise ValueError(split_plan['warnings'][0])
+    if expected_split_hash is not None and split_plan['preview_hash'] != expected_split_hash:
+        raise ValueError('导出预览之后标注或来源已变化，请重新预览')
     focus = None
     if focus_region_id:
         focus = next((row for row in store.list_focus_regions(spec["project_id"]) if row["id"] == focus_region_id), None)
@@ -81,6 +88,8 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None, split
         conn.execute("BEGIN")
         revision = conn.execute("SELECT revision FROM task_annotation_sets WHERE id=?", (set_id,)).fetchone()[0]
         rows = conn.execute("SELECT * FROM task_frame_annotations WHERE set_id=? ORDER BY frame_id", (set_id,)).fetchall()
+    if revision != split_plan['annotation_revision'] or {row['frame_id']:row['revision'] for row in rows} != split_plan['annotation_revisions']:
+        raise ValueError('标注在导出开始前变化，请重新预览')
     if len(rows) < 2:
         raise ValueError("至少保存两张标注图片，分别用于训练和验证")
     prepared = []
@@ -105,49 +114,10 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None, split
     output = DATASETS_DIR / spec["project_id"] / dataset_id
     labels = (["__background__"] if spec["task_type"] == "semantic_segment" else []) + spec["label_codes"]
     ordered = sorted(prepared, key=lambda row: hashlib.sha256(row[0]["id"].encode()).hexdigest())
-    val_count = max(1, round(len(ordered) * .2))
-    source_splits = {}
-    for frame_set_id in {row[0]["frame_set_id"] for row in prepared}:
-        frame_set = store.get_frame_set(frame_set_id)
-        source_splits.update(frame_set.get("config", {}).get("source_splits", {}))
-    # 只要导入集声明拆分，就必须完整保留；混合未声明帧时拒绝隐式重新分配。
-    if source_splits and any(row[0]["id"] not in source_splits for row in prepared):
-        raise ValueError("当前集合混合了有来源拆分和无拆分的帧，请分开导出")
-    if source_splits and not {"train", "val"} <= {source_splits[row[0]["id"]] for row in prepared}:
-        raise ValueError("保留来源拆分的导出必须同时包含train和val，不能自动移动样本")
-    video_groups = {}
-    for frame, *_ in prepared:
-        video_groups.setdefault(frame["video_id"], []).append(frame["id"])
-    group_splits = {}
-    if split_by_video is not None:
-        if (not isinstance(split_by_video, dict) or set(split_by_video) != set(video_groups)
-                or not set(split_by_video.values()) <= {"train", "val", "test"}
-                or not {"train", "val"} <= set(split_by_video.values())):
-            raise ValueError("视频分组划分必须完整覆盖当前视频，且至少包含训练和验证组")
-        group_splits = split_by_video
-    elif not source_splits and len(video_groups) >= 2:
-        # 视频分组优先，样本量最大的来源作为训练；其余来源独立留出，不拆相邻帧。
-        groups = sorted(video_groups, key=lambda key: (-len(video_groups[key]), key))
-        group_splits = {key: "train" for key in groups}
-        group_splits[groups[-1]] = "val"
-        if len(groups) >= 3:
-            group_splits[groups[-2]] = "test"
-    if group_splits:
-        source_identities = {}
-        for video_id, split in group_splits.items():
-            video = store.get_video(video_id)
-            identity = str(video.get("asset_id") or Path(video["path"]).resolve())
-            if identity in source_identities and source_identities[identity] != split:
-                raise ValueError("同一来源视频不能跨训练、验证、测试组")
-            source_identities[identity] = split
-        for frame, *_ in prepared:
-            desired = group_splits[frame["video_id"]]
-            if frame["id"] in source_splits and source_splits[frame["id"]] != desired:
-                raise ValueError("视频分组与已导入来源划分冲突，不自动移动样本")
-            source_splits[frame["id"]] = desired
+    source_splits = split_plan['assignments']
     index = []
     for number, (frame, source, bounds, mask_png, lines, frame_revision) in enumerate(ordered):
-        split = source_splits[frame["id"]] if source_splits else ("val" if number < val_count else "train")
+        split = source_splits[frame["id"]]
         image_dir = output / "images" / split
         label_dir = output / ("masks" if mask_png is not None else "labels") / split
         image_dir.mkdir(parents=True, exist_ok=True)
@@ -173,9 +143,9 @@ def export_set(set_id: str, name: str, focus_region_id: str | None = None, split
     metadata = {"task_type": spec["task_type"], "annotation_set_id": set_id, "annotation_revision": revision, "background_id": 0 if spec["task_type"] == "semantic_segment" else None, "ignore_id": 255 if spec["task_type"] == "semantic_segment" else None, "image_scope": "focus_region_crop" if focus else "full_image", "recommended_imgsz": 640, "crop_polygon_precision": "one_pixel" if focus and spec["task_type"] == "instance_segment" else "original", "split_policy": "deterministic_frame_hash_not_accuracy_benchmark"}
     if focus:
         metadata.update(focus_region_id=focus["id"], focus_region_name=focus["name"], focus_region_rect_norm=rect)
-    if source_splits:
-        metadata["split_policy"] = "preserved_import_source"
-    if group_splits:
-        metadata.update(split_policy="video_source_groups", split_by_video=group_splits)
+    metadata.update(split_policy=split_plan['policy'], split_groups=split_plan['groups'],
+                    split_warnings=split_plan['warnings'], split_preview_hash=split_plan['preview_hash'])
+    if split_by_video is not None:
+        metadata['split_by_video']=split_by_video
     counts = {f"{split}_count": sum(row["split"] == split for row in index) for split in ("train", "val", "test")}
     return store.save_dataset_version({"id": dataset_id, "project_id": spec["project_id"], "name": name or spec["name"], "output_dir": output, "label_codes": labels, "frame_set_ids": sorted({row[0]["frame_set_id"] for row in prepared}), "summary": {"frame_count": len(rows), **counts, "task_type": spec["task_type"]}, "metadata": metadata, "status": "ready"})

@@ -73,7 +73,7 @@ def test_save_reload_export_and_restore(client, task, tmp_path):
         assert saved.status_code == 200, saved.text
         assert client.get(url).json() == saved.json()
         assert client.put(url,json=payload).status_code == 400
-    exported = client.post(f"/api/annotation-sets/{set_id}/export",json={"name":"版本1"})
+    exported = client.post(f"/api/annotation-sets/{set_id}/export",json={"name":"版本1","allow_frame_split":True})
     assert exported.status_code == 200, exported.text
     result = exported.json(); output = Path(result["output_dir"])
     assert result["metadata"]["task_type"] == task
@@ -100,7 +100,7 @@ def test_multifragment_preserved_and_export_refused(client):
         result = client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=object_payload("instance_segment",2))
         assert result.status_code == 200
         assert len(result.json()["objects"][0]["polygons"]) == 2
-    response = client.post(f"/api/annotation-sets/{set_id}/export",json={})
+    response = client.post(f"/api/annotation-sets/{set_id}/export",json={"allow_frame_split":True})
     assert response.status_code == 400 and "one" in response.text
 
 
@@ -176,7 +176,7 @@ def test_yolo_import_export_roundtrip(client,task):
     for i in range(2):
         payload={"revision":0,"mask_rle":[255,96,0,900,1,540]} if task=="semantic_segment" else object_payload(task)
         assert client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=payload).status_code==200
-    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={}).json()
+    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={"allow_frame_split":True}).json()
     source=Path(exported["output_dir"])
     # 记录全部源文件内容哈希，导入不得覆盖、转换或重写来源。
     import hashlib
@@ -209,8 +209,60 @@ def test_yolo_import_export_roundtrip(client,task):
 def test_import_traversal_and_task_mismatch(client,tmp_path):
     set_id=make_set(client,"instance_segment")
     for i in range(2): client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=object_payload("instance_segment"))
-    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={}).json()
+    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={"allow_frame_split":True}).json()
     request={"project_id":"p","name":"禁止混用","task_type":"detect","source_dir":exported["output_dir"]}
     assert client.post("/api/task-datasets/inspect",json=request).status_code==400
     with pytest.raises(ValueError): task_importer.local_child(tmp_path.resolve(),"../escape")
     with pytest.raises(ValueError): task_importer.local_child(tmp_path.resolve(),"C:\\private\\mask.png")
+
+
+@pytest.mark.parametrize("task", ["detect", "instance_segment", "semantic_segment"])
+def test_export_preview_requires_explicit_choice_and_rejects_stale_revision(client, task, tmp_path):
+    """三任务均先确认来源不足风险；预览后发生编辑时，不生成误用旧划分的目录。"""
+    set_id = make_set(client, task)
+    for index in range(3):
+        payload = {"revision": 0, "mask_rle": [0, 1536]} if task == "semantic_segment" else object_payload(task)
+        assert client.put(f"/api/annotation-sets/{set_id}/frames/f{index}", json=payload).status_code == 200
+    endpoint = f"/api/annotation-sets/{set_id}"
+    preview = client.post(endpoint + "/export-preview", json={}).json()
+    assert preview["requires_choice"] and preview["frame_count"] == 3
+    assert "assignments" not in preview and "annotation_revisions" not in preview
+    assert client.post(endpoint + "/export", json={}).status_code == 400
+    assert not (tmp_path / "datasets").exists()
+    # 风险确认只接受布尔值，字符串不能因Python真值被误判为同意。
+    assert client.post(endpoint + "/export-preview", json={"allow_frame_split": "false"}).status_code == 400
+    choice = {"allow_frame_split": True}
+    agreed = client.post(endpoint + "/export-preview", json=choice).json()
+    assert not agreed["requires_choice"] and agreed["counts"] == {"train": 2, "val": 1}
+    assert agreed["preview_hash"] == client.post(endpoint + "/export-preview", json=choice).json()["preview_hash"]
+    current = client.get(endpoint + "/frames/f0").json()
+    # 保存只发送写合同，GET中的帧尺寸/任务等只读字段必须继续被接口拒绝。
+    changed = {"revision": current["revision"],
+               **({"mask_rle": current["mask_rle"]} if task == "semantic_segment" else {"objects": current["objects"]})}
+    assert client.put(endpoint + "/frames/f0", json=changed).status_code == 200
+    stale = client.post(endpoint + "/export", json={**choice, "split_preview_hash": agreed["preview_hash"]})
+    assert stale.status_code == 400 and "重新预览" in stale.text
+    assert not (tmp_path / "datasets").exists()
+    fresh = client.post(endpoint + "/export-preview", json=choice).json()
+    assert client.post(endpoint + "/export", json={**choice, "split_preview_hash": fresh["preview_hash"]}).status_code == 200
+
+
+def test_source_groups_and_duplicate_content_cannot_leak_between_splits(client):
+    """真实来源保持整组，相同内容即使声明不同来源也不能跨训练/验证。"""
+    set_id = make_set(client, "detect")
+    for index in range(3):
+        assert client.put(f"/api/annotation-sets/{set_id}/frames/f{index}", json=object_payload("detect")).status_code == 200
+    with db.get_conn() as conn:
+        conn.execute("UPDATE frame_sets SET config_json=? WHERE id='fs'", (json.dumps({
+            "source_groups": {"f0": "clip-a", "f1": "clip-a", "f2": "clip-b"}}),))
+    endpoint = f"/api/annotation-sets/{set_id}/export-preview"
+    preview = client.post(endpoint, json={}).json()
+    assert preview["counts"] == {"train": 2, "val": 1}
+    assert sorted(row["count"] for row in preview["groups"]) == [1, 2]
+    with db.get_conn() as conn:
+        conn.execute("INSERT INTO image_assets(id,project_id,sha256,path,width,height) VALUES('same','p',?,'unused',48,32)", ("a" * 64,))
+        for frame, split in (("f0", "train"), ("f2", "val")):
+            conn.execute("INSERT INTO frame_image_sources(frame_id,asset_id,original_name,relative_path,source_group,split) VALUES(?,'same',?,?,?,?)",
+                         (frame, frame + '.png', frame + '.png', frame, split))
+    rejected = client.post(endpoint, json={})
+    assert rejected.status_code == 400 and "相同原图" in rejected.text
