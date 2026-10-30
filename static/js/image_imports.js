@@ -7,11 +7,11 @@
   const identity = item => JSON.stringify([item.relative_path, item.size ?? item.byte_size, item.last_modified]);
   const fileInfo = file => ({relative_path:file.webkitRelativePath || file.name, size:file.size, last_modified:file.lastModified});
   const safe = fn => async event => {try {await fn(event);} catch(error) {el('status').textContent=error.message; showToast(error.message,'error');}};
-  function locked(value) {
+  function locked(value, {allowCancel=true}={}) {
     running=value;
     for (const id of ['start','resume','jobs','files','folder','name','group','split','target']) el(id).disabled=value;
     document.getElementById('active-project').disabled=value;
-    el('cancel').disabled=!value;
+    el('cancel').disabled=!value || !allowCancel;
   }
   function draw(task) {
     const c=task.counts || {}, done=(c.completed||0)+(c.duplicate||0), failed=c.failed||0;
@@ -102,7 +102,8 @@
     const body={project_id:project(),name:el('name').value.trim(),frame_set_id:el('target').value||null,
       client_key:crypto.randomUUID(),files:files.map(file=>({...fileInfo(file),source_group:el('group').value.trim(),split:el('split').value}))};
     // 防止创建请求未结束时重复点击建立并行任务。
-    locked(true);
+    // 创建请求尚未返回时selected仍可能是上一个任务，禁止误取消旧任务。
+    locked(true,{allowCancel:false});
     try {selected=await apiPost('/api/image-imports',body);} finally {locked(false);}
     await uploadTask(selected);
   });
