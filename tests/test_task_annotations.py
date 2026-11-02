@@ -266,3 +266,36 @@ def test_source_groups_and_duplicate_content_cannot_leak_between_splits(client):
                          (frame, frame + '.png', frame + '.png', frame, split))
     rejected = client.post(endpoint, json={})
     assert rejected.status_code == 400 and "相同原图" in rejected.text
+
+@pytest.mark.parametrize("task", ["detect","instance_segment","semantic_segment"])
+def test_external_import_rejects_duplicate_content_across_splits(client,task):
+    """三个正式导入入口都应在复制前拒绝跨拆分重复内容。"""
+    set_id=make_set(client,task)
+    for i in range(2):
+        payload={"revision":0,"mask_rle":[0,996,1,540]} if task=="semantic_segment" else object_payload(task)
+        assert client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=payload).status_code==200
+    exported=client.post(f"/api/annotation-sets/{set_id}/export",json={"allow_frame_split":True}).json()
+    source=Path(exported["output_dir"])
+    train=next((source/"images/train").iterdir())
+    val=next((source/"images/val").iterdir())
+    val.write_bytes(train.read_bytes())
+    request={"project_id":"p","name":"重复内容","task_type":task,"source_dir":str(source)}
+    for endpoint in ("/api/task-datasets/inspect","/api/task-datasets/import"):
+        result=client.post(endpoint,json=request)
+        assert result.status_code==400 and "相同原图" in result.text
+
+
+@pytest.mark.parametrize("task", ["detect","instance_segment","semantic_segment"])
+def test_legacy_unregistered_duplicate_is_rejected_by_preview_and_export(client,task,tmp_path):
+    """旧库没有来源表或哈希时也必须补算，风险确认不能绕过内容泄漏检查。"""
+    set_id=make_set(client,task)
+    for i in range(2):
+        payload={"revision":0,"mask_rle":[0,996,1,540]} if task=="semantic_segment" else object_payload(task)
+        assert client.put(f"/api/annotation-sets/{set_id}/frames/f{i}",json=payload).status_code==200
+    (tmp_path/"1.png").write_bytes((tmp_path/"0.png").read_bytes())
+    with db.get_conn() as conn:
+        conn.execute("UPDATE frame_sets SET config_json=? WHERE id='fs'",(json.dumps({
+            "source_type":"yolo_import","source_splits":{"f0":"train","f1":"val"}}),))
+    for suffix in ("export-preview","export"):
+        result=client.post(f"/api/annotation-sets/{set_id}/{suffix}",json={"allow_frame_split":True})
+        assert result.status_code==400 and "相同原图" in result.text

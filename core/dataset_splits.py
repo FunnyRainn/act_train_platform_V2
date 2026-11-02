@@ -6,6 +6,7 @@ from pathlib import Path
 
 from core.db import get_conn
 from core.task_annotations import get_set
+from core.content_identity import frame_sha256
 
 
 def preview(set_id: str, *, allow_frame_split: bool = False, split_by_video: dict | None = None) -> dict:
@@ -20,7 +21,7 @@ def preview(set_id: str, *, allow_frame_split: bool = False, split_by_video: dic
         conn.execute("BEGIN")
         revision = conn.execute("SELECT revision FROM task_annotation_sets WHERE id=?", (set_id,)).fetchone()[0]
         rows = [dict(row) for row in conn.execute("""
-            SELECT a.frame_id,a.revision,f.video_id,fs.config_json,v.asset_id,v.path,
+            SELECT a.frame_id,a.revision,f.video_id,f.path AS frame_path,fs.config_json,v.asset_id,v.path,
                    s.source_group,s.split,ia.sha256
             FROM task_frame_annotations a JOIN frames f ON f.id=a.frame_id
             JOIN frame_sets fs ON fs.id=f.frame_set_id JOIN videos v ON v.id=f.video_id
@@ -35,6 +36,7 @@ def preview(set_id: str, *, allow_frame_split: bool = False, split_by_video: dic
     groups, declared, assignments, identity_splits = {}, {}, {}, {}
     for row in rows:
         cfg=json.loads(row['config_json'])
+        row['sha256']=frame_sha256(row,cfg)
         split=row['split'] or cfg.get('source_splits',{}).get(row['frame_id'],'')
         source=row['source_group'] or cfg.get('source_groups',{}).get(row['frame_id'])
         video_identity=str(row['asset_id'] or Path(row['path']).resolve())

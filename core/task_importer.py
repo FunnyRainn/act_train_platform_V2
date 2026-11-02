@@ -15,6 +15,7 @@ from core.paths import FRAMES_DIR
 from core.task_annotations import MAX_PIXELS, get_set, normalize_objects
 from core.task_contract import task_type
 from core.utils import IMAGE_SUFFIXES, new_id
+from core.content_identity import file_sha256
 
 
 def local_child(root: Path, value: str) -> Path:
@@ -75,7 +76,7 @@ def inspect_source(project_id: str, task: str, source_dir: str) -> tuple[dict,li
     project=store.get_project(project_id)
     if not labels or any(code not in project["label_codes"] for code in labels): raise ValueError("names必须对应当前项目标签编码；请先在项目配置这些编码")
     spec={"project_id":project_id,"task_type":task,"label_codes":labels}
-    prepared=[]; seen=set()
+    prepared=[]; seen=set(); content_splits={}
     for split in ("train","val","test"):
         value=config.get(split)
         if not value: continue
@@ -92,6 +93,10 @@ def inspect_source(project_id: str, task: str, source_dir: str) -> tuple[dict,li
             if source in seen: raise ValueError("同一图片被多个拆分重复引用")
             seen.add(source)
             if len(seen)>10000: raise ValueError("单次导入最多10000张图片，请分成明确批次")
+            image_hash=file_sha256(source)
+            if image_hash in content_splits and content_splits[image_hash] != split:
+                raise ValueError("相同原图不能跨训练、验证和测试集合")
+            content_splits[image_hash]=split
             image=cv2.imread(str(source))
             if image is None or image.shape[0]*image.shape[1]>MAX_PIXELS: raise ValueError(f"图片无法读取或超过像素上限: {image_path.name}")
             sub=image_path.relative_to(image_dir)
@@ -103,7 +108,7 @@ def inspect_source(project_id: str, task: str, source_dir: str) -> tuple[dict,li
                 if not set(np.unique(mask).tolist()) <= set(range(len(names)))|{255}: raise ValueError(f"语义mask含未定义类别: {sub}")
             else: parse_objects(annotation_path,spec)
             # 预检记录内容指纹，复制提交前再次核验，避免长导入期间来源被替换。
-            prepared.append((source,annotation_path,image.shape[1],image.shape[0],split,hashlib.sha256(source.read_bytes()).hexdigest(),hashlib.sha256(annotation_path.read_bytes()).hexdigest()))
+            prepared.append((source,annotation_path,image.shape[1],image.shape[0],split,image_hash,hashlib.sha256(annotation_path.read_bytes()).hexdigest()))
     if not prepared: raise ValueError("数据集中没有可导入图片")
     return spec,prepared
 
@@ -120,7 +125,7 @@ def import_set(project_id: str, name: str, task: str, source_dir: str) -> dict:
         conn.execute("INSERT INTO task_annotation_sets(id,project_id,name,task_type,labels_json,revision) VALUES(?,?,?,?,?,?)",(set_id,project_id,name.strip(),task,json.dumps(spec["label_codes"]),len(prepared)))
         conn.execute("INSERT INTO videos(id,project_id,name,source_type,path,frame_count) VALUES(?,?,?,?,?,?)",(video_id,project_id,name,"image_dataset",str(destination),len(prepared)))
         conn.execute("INSERT INTO frame_sets(id,project_id,video_id,name,output_dir,sample_every_n_frames,frame_count,status,config_json) VALUES(?,?,?,?,?,1,?,'finished',?)",(frame_set_id,project_id,video_id,name,str(destination),len(prepared),json.dumps({"source_type":"yolo_import","task_type":task})))
-        source_splits={}
+        source_splits={}; source_hashes={}
         for index,(source,annotation_path,width,height,split,image_hash,label_hash) in enumerate(prepared):
             frame_id=new_id("frame"); target=destination/(frame_id+source.suffix.lower())
             shutil.copy2(source,target)
@@ -128,12 +133,13 @@ def import_set(project_id: str, name: str, task: str, source_dir: str) -> dict:
             if hashlib.sha256(target.read_bytes()).hexdigest()!=image_hash or hashlib.sha256(label_bytes).hexdigest()!=label_hash:
                 raise ValueError("导入期间来源内容变化，已回滚数据库；请保持数据集不变后重试")
             source_splits[frame_id]=split
+            source_hashes[frame_id]=image_hash
             conn.execute("INSERT INTO frames(id,frame_set_id,video_id,frame_index,path,width,height) VALUES(?,?,?,?,?,?,?)",(frame_id,frame_set_id,video_id,index,str(target),width,height))
             objects=parse_objects(annotation_path,spec) if task!="semantic_segment" else []
             png=label_bytes if task=="semantic_segment" else None
             conn.execute("INSERT INTO task_frame_annotations(set_id,frame_id,payload_json,mask_png,revision) VALUES(?,?,?,?,1)",(set_id,frame_id,json.dumps({"objects":objects},ensure_ascii=False),png))
         # 拆分是数据来源的一部分；后续导出优先保留，不能自动把测试图放进训练集。
-        conn.execute("UPDATE frame_sets SET config_json=? WHERE id=?",(json.dumps({"source_type":"yolo_import","task_type":task,"source_splits":source_splits}),frame_set_id))
+        conn.execute("UPDATE frame_sets SET config_json=? WHERE id=?",(json.dumps({"source_type":"yolo_import","task_type":task,"source_splits":source_splits,"source_hashes":source_hashes}),frame_set_id))
     return {"annotation_set":get_set(set_id),"frame_set_id":frame_set_id,"frame_count":len(prepared),"source_preserved":True}
 
 
